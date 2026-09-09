@@ -1,0 +1,7 @@
+__pycache__/
+.venv/
+node_modules/
+*.pt
+model/data/*.txt
+model/data/*.bin
+dist/
