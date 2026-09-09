@@ -18,7 +18,8 @@ from model import BLOCK_SIZE, FlowLM
 from tokenizer import DATA, WordTokenizer
 
 BATCH_SIZE = 32
-LEARNING_RATE = 3e-4      # gentler than Tiny-GPT's 1e-3: bigger models need it
+LEARNING_RATE = 6e-4      # measured 1484 tok/s, so CPU time is the constraint;
+                          # warmup + gradient clipping make this rate safe
 EVAL_INTERVAL = 500
 EVAL_ITERS = 40
 WARMUP_ITERS = 200        # ramp the rate up so early steps can't blow up
@@ -87,6 +88,10 @@ if __name__ == "__main__":
           f"= {BATCH_SIZE * BLOCK_SIZE:,} tokens/step\n", flush=True)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    if os.path.exists(CKPT):
+        ck = torch.load(CKPT, map_location="cpu")
+        if "optim" in ck:
+            optimizer.load_state_dict(ck["optim"])
     t0 = time.time()
 
     for it in range(start_iter, MAX_ITERS + 1):
@@ -99,6 +104,7 @@ if __name__ == "__main__":
             if losses["val"] < best_val:
                 best_val = losses["val"]
                 torch.save({"model": model.state_dict(),
+                            "optim": optimizer.state_dict(),
                             "vocab_size": tok.vocab_size,
                             "val_loss": best_val,
                             "iter": it}, CKPT)

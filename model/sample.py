@@ -30,13 +30,38 @@ def load():
     return _cache["model"], _cache["tok"], _cache["meta"]
 
 
+# The corpus separates its 155,520 stories with "<|endoftext|>", so the model
+# correctly learns to emit it when a story finishes. That is a signal to stop,
+# not text to show anyone — the same way every real LLM handles its own
+# end-of-text token.
+STOP = "<|"
+
+
 def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40):
-    """Yield decoded text one token at a time."""
+    """Yield decoded text one token at a time, stopping at end-of-story."""
     model, tok, _ = load()
     ids = tok.encode(prompt) or [tok.stoi.get(" the", 256)]
     idx = torch.tensor([ids], dtype=torch.long)
+
+    # The stop marker spans several word-level tokens, so the tail has to be
+    # buffered rather than checked one token at a time.
+    tail = ""
     for token_id in model.generate(idx, max_new_tokens, temperature, top_k):
-        yield tok.decode([token_id])
+        piece = tok.decode([token_id])
+        combined = tail + piece
+        if STOP in combined:
+            head = combined.split(STOP)[0]
+            if head:
+                yield head
+            return
+        # Hold back the last character in case it is the start of the marker.
+        if combined.endswith(STOP[0]):
+            tail = combined[-1:]
+            emit = combined[:-1]
+        else:
+            tail, emit = "", combined
+        if emit:
+            yield emit
 
 
 def generate(prompt, max_new_tokens=120, temperature=0.8, top_k=40):
