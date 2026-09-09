@@ -34,20 +34,32 @@ def main():
     print(f"chat:   {len(chat):,} characters")
     print(f"replay: {len(replay):,} characters of original stories")
 
-    ids = []
-    for name, text in (("chat", chat), ("replay", replay)):
+    def encode_all(name, text):
+        ids = []
         for start in range(0, len(text), 5_000_000):
             ids.extend(tok.encode(text[start:start + 5_000_000]))
             print(f"  encoding {name}: {len(ids):,} tokens", flush=True)
+        return np.array(ids, dtype=np.uint16)
 
-    arr = np.array(ids, dtype=np.uint16)
-    n = int(0.95 * len(arr))       # chat data is precious; keep validation small
-    arr[:n].tofile(TRAIN_BIN)
-    arr[n:].tofile(VAL_BIN)
+    chat_ids = encode_all("chat", chat)
+    replay_ids = encode_all("replay", replay)
 
-    print(f"\ntokens: {len(arr):,}")
-    print(f"train:  {n:,} -> {TRAIN_BIN}")
-    print(f"val:    {len(arr) - n:,} -> {VAL_BIN}")
+    # Validation must be held out from the CHAT data specifically. Splitting
+    # the concatenated file by position put the replay stories at the end, so
+    # validation contained no conversations at all and measured story quality
+    # while the model was being trained to converse — the metric moved the
+    # wrong way and the "save on improvement" rule stopped saving.
+    cut = int(0.95 * len(chat_ids))
+    train = np.concatenate([chat_ids[:cut], replay_ids])
+    val = chat_ids[cut:]
+
+    train.tofile(TRAIN_BIN)
+    val.tofile(VAL_BIN)
+
+    print(f"\ntokens: {len(train) + len(val):,}")
+    print(f"train:  {len(train):,} ({cut:,} chat + {len(replay_ids):,} replay)")
+    print(f"val:    {len(val):,} (chat only — the thing being optimised)")
+    arr = train
 
     ok = len(arr) > 3_000_000
     print(f"\n{'CHAT TOKENS READY' if ok else 'TOO FEW TOKENS'} (need > 3M)")

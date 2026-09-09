@@ -7,6 +7,7 @@ Overnight, so the Mac doesn't sleep:
 Saves ckpt.pt only when validation loss improves, so an interrupted run still
 leaves the best model on disk.
 """
+import math
 import os
 import sys
 import time
@@ -23,6 +24,10 @@ LEARNING_RATE = 6e-4      # measured 1484 tok/s, so CPU time is the constraint;
 EVAL_INTERVAL = 500
 EVAL_ITERS = 40
 WARMUP_ITERS = 200        # ramp the rate up so early steps can't blow up
+MIN_LR = LEARNING_RATE / 10
+# Cosine decay: high rate early to explore, small rate late to settle. Worth a
+# few percent of final loss on a long run, for a handful of lines.
+DECAY = os.environ.get("FLOW_DECAY", "1") == "1"
 MAX_ITERS = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
 # Second argument picks the dataset: "" is the base story data, "chat_" is
 # the conversation data used for fine-tuning.
@@ -62,12 +67,21 @@ def estimate_loss(model):
     return out
 
 
-def lr_at(it):
-    """Linear warmup, then flat. Warmup stops the first few huge steps from
-    wrecking a freshly initialised model."""
+def lr_at(it, total=None):
+    """Linear warmup, then cosine decay down to MIN_LR.
+
+    Warmup stops the first few huge steps from wrecking the model; the decay
+    lets it take smaller, more careful steps as it converges.
+    """
     if it < WARMUP_ITERS:
         return LEARNING_RATE * (it + 1) / WARMUP_ITERS
-    return LEARNING_RATE
+    if not (DECAY and total):
+        return LEARNING_RATE
+    if it >= total:
+        return MIN_LR
+    progress = (it - WARMUP_ITERS) / max(total - WARMUP_ITERS, 1)
+    coeff = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return MIN_LR + coeff * (LEARNING_RATE - MIN_LR)
 
 
 if __name__ == "__main__":
@@ -117,10 +131,11 @@ if __name__ == "__main__":
                 star = "  <- saved"
             print(f"iter {it:6d}   train {losses['train']:.4f}   "
                   f"val {losses['val']:.4f}   {mins:6.1f} min   "
-                  f"{tps:5.0f} tok/s{star}", flush=True)
+                  f"{tps:5.0f} tok/s  lr {lr_at(it, MAX_ITERS):.1e}{star}",
+                  flush=True)
 
         for g in optimizer.param_groups:
-            g["lr"] = lr_at(it)
+            g["lr"] = lr_at(it, MAX_ITERS)
 
         x, y = get_batch("train")
         _, loss = model(x, y)
