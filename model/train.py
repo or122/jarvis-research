@@ -24,6 +24,9 @@ EVAL_INTERVAL = 500
 EVAL_ITERS = 40
 WARMUP_ITERS = 200        # ramp the rate up so early steps can't blow up
 MAX_ITERS = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
+# Second argument picks the dataset: "" is the base story data, "chat_" is
+# the conversation data used for fine-tuning.
+PREFIX = sys.argv[2] if len(sys.argv) > 2 else ""
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CKPT = os.path.join(HERE, "ckpt.pt")
@@ -32,8 +35,8 @@ torch.manual_seed(1337)
 
 # memmap: the token files stay on disk and pages are read as needed, so a
 # 70 MB dataset never has to sit in RAM alongside the model.
-train_data = np.memmap(os.path.join(DATA, "train.bin"), dtype=np.uint16, mode="r")
-val_data = np.memmap(os.path.join(DATA, "val.bin"), dtype=np.uint16, mode="r")
+train_data = np.memmap(os.path.join(DATA, f"{PREFIX}train.bin"), dtype=np.uint16, mode="r")
+val_data = np.memmap(os.path.join(DATA, f"{PREFIX}val.bin"), dtype=np.uint16, mode="r")
 
 
 def get_batch(split):
@@ -78,12 +81,15 @@ if __name__ == "__main__":
     if os.path.exists(CKPT):
         ck = torch.load(CKPT, map_location="cpu")
         model.load_state_dict(ck["model"])
-        best_val = ck["val_loss"]
+        # On a different dataset the old best_val is not comparable, so
+        # reset it — otherwise nothing would ever look like an improvement
+        # and no checkpoint would be saved.
+        best_val = float("inf") if PREFIX else ck["val_loss"]
         start_iter = ck["iter"]
         resumed = f"  (resumed from iter {start_iter}, val {best_val:.4f})"
 
     print(f"parameters: {n_params:,}   vocab: {tok.vocab_size}   "
-          f"tokens: {len(train_data):,}{resumed}")
+          f"tokens: {len(train_data):,}   dataset: {PREFIX or 'base'}{resumed}")
     print(f"iters: {MAX_ITERS}   batch: {BATCH_SIZE}x{BLOCK_SIZE} "
           f"= {BATCH_SIZE * BLOCK_SIZE:,} tokens/step\n", flush=True)
 

@@ -1,6 +1,11 @@
 """Generate text from Flow's trained model.
 
-Run:  .venv/bin/python model/sample.py ["your prompt here"]
+Two modes:
+  continue  — the model carries your text on (what a raw language model does)
+  chat      — the model replies to you (what Flow's app uses)
+
+Run:  .venv/bin/python model/sample.py "hello"
+      .venv/bin/python model/sample.py --continue "Once upon a time"
 """
 import os
 import sys
@@ -13,6 +18,12 @@ from tokenizer import WordTokenizer
 HERE = os.path.dirname(os.path.abspath(__file__))
 CKPT = os.path.join(HERE, "ckpt.pt")
 
+# "<|" starts the end-of-story marker the corpus uses between its 155,520
+# stories; "\nYou:" is the start of the *user's* next turn, which the model
+# will happily write for you if nothing stops it. Both mean: this reply is
+# over. Every real chat model has the same pair of stop conditions.
+STOPS = ("<|", "\nYou:", "\nYou :")
+
 _cache = {}
 
 
@@ -24,55 +35,76 @@ def load():
         model = FlowLM(ckpt["vocab_size"])
         model.load_state_dict(ckpt["model"])
         model.eval()          # dropout off
-        _cache["model"] = model
-        _cache["tok"] = tok
-        _cache["meta"] = ckpt
+        _cache.update(model=model, tok=tok, meta=ckpt)
     return _cache["model"], _cache["tok"], _cache["meta"]
 
 
-# The corpus separates its 155,520 stories with "<|endoftext|>", so the model
-# correctly learns to emit it when a story finishes. That is a signal to stop,
-# not text to show anyone — the same way every real LLM handles its own
-# end-of-text token.
-STOP = "<|"
-
-
-def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40):
-    """Yield decoded text one token at a time, stopping at end-of-story."""
+def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40, stops=STOPS):
+    """Yield decoded text as it is generated, ending at any stop sequence."""
     model, tok, _ = load()
     ids = tok.encode(prompt) or [tok.stoi.get(" the", 256)]
     idx = torch.tensor([ids], dtype=torch.long)
 
-    # The stop marker spans several word-level tokens, so the tail has to be
-    # buffered rather than checked one token at a time.
-    tail = ""
+    # A stop sequence spans several word-level tokens, so text is accumulated
+    # and a short tail is held back in case it turns out to be the beginning
+    # of one. Without that, "\nYou" would be shown before ":" arrives.
+    hold = max(len(s) for s in stops) - 1
+    buffer, sent = "", 0
+
     for token_id in model.generate(idx, max_new_tokens, temperature, top_k):
-        piece = tok.decode([token_id])
-        combined = tail + piece
-        if STOP in combined:
-            head = combined.split(STOP)[0]
-            if head:
-                yield head
+        buffer += tok.decode([token_id])
+
+        hits = [buffer.find(s) for s in stops]
+        hits = [h for h in hits if h != -1]
+        if hits:
+            stop_at = min(hits)
+            if stop_at > sent:
+                yield buffer[sent:stop_at]
             return
-        # Hold back the last character in case it is the start of the marker.
-        if combined.endswith(STOP[0]):
-            tail = combined[-1:]
-            emit = combined[:-1]
-        else:
-            tail, emit = "", combined
-        if emit:
-            yield emit
+
+        safe = len(buffer) - hold
+        if safe > sent:
+            yield buffer[sent:safe]
+            sent = safe
+
+    if len(buffer) > sent:
+        yield buffer[sent:]
 
 
-def generate(prompt, max_new_tokens=120, temperature=0.8, top_k=40):
-    return "".join(stream(prompt, max_new_tokens, temperature, top_k))
+def chat_stream(message, **kw):
+    """Ask the model to reply, rather than to carry on writing.
+
+    The prompt ends mid-line at "Me:" on purpose: the model's job is to
+    complete that line, and completing it is a reply.
+    """
+    return stream(f"You: {message}\nMe:", **kw)
+
+
+def generate(prompt, **kw):
+    return "".join(stream(prompt, **kw))
+
+
+def chat(message, **kw):
+    return "".join(chat_stream(message, **kw)).strip()
 
 
 if __name__ == "__main__":
-    prompt = sys.argv[1] if len(sys.argv) > 1 else "Once upon a time"
+    args = sys.argv[1:]
+    mode_continue = args and args[0] == "--continue"
+    if mode_continue:
+        args = args[1:]
+    text = args[0] if args else ("Once upon a time" if mode_continue else "hello")
+
     _, _, meta = load()
     print(f"checkpoint: iter {meta['iter']}, val loss {meta['val_loss']:.4f}\n")
-    print(prompt, end="", flush=True)
-    for piece in stream(prompt, max_new_tokens=150):
-        print(piece, end="", flush=True)
+
+    if mode_continue:
+        print(text, end="", flush=True)
+        for piece in stream(text, max_new_tokens=150):
+            print(piece, end="", flush=True)
+    else:
+        print(f"You:  {text}")
+        print("Flow:", end=" ", flush=True)
+        for piece in chat_stream(text, max_new_tokens=100):
+            print(piece, end="", flush=True)
     print()

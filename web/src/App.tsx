@@ -144,11 +144,19 @@ export default function App() {
       <main>
         {messages.length === 0 && (
           <div className="empty">
-            <p className="big">Say something and Flow will carry it on.</p>
+            <p className="big">Say hello to Flow.</p>
             <p className="small">
-              Flow's model was trained from zero on this machine. It writes like a storyteller
-              rather than answering questions — it has no facts, only language.
+              Flow's model was built and trained from zero on this machine. It talks, but it
+              knows no facts — it learned language, not the world. Ask it about itself, or
+              just chat.
             </p>
+            <div className="suggestions">
+              {['hello', 'what is your name?', 'tell me a story', 'how are you?'].map((s) => (
+                <button key={s} className="chip" onClick={() => setInput(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m, i) => (

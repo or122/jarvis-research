@@ -77,6 +77,9 @@ class Handler(BaseHTTPRequestHandler):
         prompt = str(req.get("prompt", ""))[:2000]
         max_tokens = min(int(req.get("max_tokens", 120)), 400)
         temperature = float(req.get("temperature", 0.8))
+        # chat=True (the default) wraps the message as a conversation turn so
+        # the model replies. chat=False makes it carry the text on instead.
+        as_chat = bool(req.get("chat", True))
 
         if not os.path.exists(CKPT):
             self.send_error(503, "model not trained yet")
@@ -88,10 +91,11 @@ class Handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
-        from sample import stream
+        from sample import chat_stream, stream
+        producer = chat_stream if as_chat else stream
         try:
             with gen_lock:
-                for piece in stream(prompt, max_tokens, temperature):
+                for piece in producer(prompt, max_tokens, temperature):
                     # SSE frame: "data: {json}\n\n". JSON-encoding the text
                     # keeps newlines from breaking the frame format.
                     self.wfile.write(f"data: {json.dumps({'t': piece})}\n\n".encode())
