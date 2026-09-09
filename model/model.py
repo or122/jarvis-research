@@ -153,19 +153,30 @@ class FlowLM(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens):
-        """Predict one character, append it, repeat."""
+    def generate(self, idx, max_new_tokens, temperature=0.8, top_k=40):
+        """Predict one token, append it, repeat.
+
+        temperature < 1 sharpens the distribution (safer, more repetitive);
+        top_k keeps only the k most likely tokens before sampling. Without
+        top_k, the long tail of 8,192 tokens each has a small chance, and
+        those rare wrong picks are most of what reads as gibberish.
+        """
         for _ in range(max_new_tokens):
             # Position embeddings only exist up to BLOCK_SIZE, so only ever
-            # feed the model the last BLOCK_SIZE characters.
+            # feed the model the last BLOCK_SIZE tokens.
             idx_cond = idx[:, -BLOCK_SIZE:]
             logits, _ = self(idx_cond)
-            logits = logits[:, -1, :]                 # only the last position
+            logits = logits[:, -1, :] / max(temperature, 1e-5)
+
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = float("-inf")
+
             probs = F.softmax(logits, dim=-1)
             # Sample, don't argmax — argmax makes it repeat one phrase forever.
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
-        return idx
+            yield idx_next.item()
 
 
 if __name__ == "__main__":
