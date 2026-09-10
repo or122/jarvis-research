@@ -21,6 +21,8 @@ import re
 import sqlite3
 import sys
 
+from maths import solve
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(HERE, "data", "knowledge.db")
 
@@ -112,19 +114,27 @@ def teach(question, answer):
 
 
 def look_up(question):
-    """Return (answer, confidence) for the best match, or (None, 0.0).
+    """Return (answer, confidence) for the best answer, or (None, 0.0).
+
+    Arithmetic is tried first and answered by a real calculator, because
+    "2 + 2" has one correct answer and neither a stored fact nor an 11M
+    model can be trusted to produce it.
 
     Scored by how much of the stored question's keywords the asked question
     covers. Asking a longer question than the stored one is fine; a stored
     fact matching only part of what was asked is not.
     """
-    db = connect()
-    rows = db.execute("SELECT question, answer FROM facts").fetchall()
-    db.close()
+    computed = solve(question)
+    if computed is not None:
+        return computed, 1.0
 
     asked = keywords(question)
     if not asked:
         return None, 0.0
+
+    db = connect()
+    rows = db.execute("SELECT question, answer FROM facts").fetchall()
+    db.close()
 
     best, best_score = None, 0.0
     for stored_q, answer in rows:

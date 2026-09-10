@@ -16,13 +16,17 @@ from tokenizer import CORPUS, DATA, WordTokenizer
 
 CHAT = os.path.join(DATA, "chat.txt")
 CODE = os.path.join(DATA, "code.txt")
+BOOKS = os.path.join(DATA, "books.txt")
 TRAIN_BIN = os.path.join(DATA, "all_train.bin")
 VAL_BIN = os.path.join(DATA, "all_val.bin")
 
-# Repeats chosen so the final mix lands near 45% stories / 30% chat / 25% code:
-# stories are by far the largest source, so they need no repetition, while the
-# smaller chat and code sets would otherwise be drowned out.
-SOURCES = [("stories", CORPUS, 1), ("chat", CHAT, 3), ("code", CODE, 2)]
+# Repeats chosen so no source is drowned out. Real books are only ~4 MB
+# against 133 MB of TinyStories, and TinyStories is written deliberately
+# simply for young children - excellent for coherence, useless for rich or
+# creative language. Repeating the books 12x is what gives Flow a vocabulary
+# beyond "the cat was happy".
+SOURCES = [("stories", CORPUS, 1), ("chat", CHAT, 5),
+           ("code", CODE, 2), ("books", BOOKS, 12)]
 
 
 def encode_file(tok, name, path):
@@ -72,6 +76,8 @@ def main():
          f"{shares.get('code', 0):.0f}%"),
         ("chat share 20-40%", 20 <= shares.get("chat", 0) <= 40,
          f"{shares.get('chat', 0):.0f}%"),
+        ("books share 8-25%", 8 <= shares.get("books", 0) <= 25,
+         f"{shares.get('books', 0):.0f}%"),
     ]
     print("\n=== DATASET GATE ===")
     for name, passed, detail in checks:
