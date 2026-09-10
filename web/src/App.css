@@ -189,3 +189,32 @@ button.primary { background: var(--accent); color: var(--bg); border-color: var(
   color: var(--muted);
 }
 .chip:hover { color: var(--accent); border-color: var(--accent); }
+
+.tag {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.field {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.field:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.ok {
+  color: var(--accent) !important;
+  font-size: 13px;
+  margin: 0 0 14px !important;
+}

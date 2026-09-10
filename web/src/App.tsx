@@ -4,9 +4,9 @@ import './App.css'
 const SERVER = 'http://localhost:8000'
 const FREE_LIMIT = 20
 
-type Message = { role: 'you' | 'flow'; text: string }
+type Message = { role: 'you' | 'flow'; text: string; src?: 'memory' | 'model' }
 type Health =
-  | { ready: true; val_loss: number; iter: number; vocab_size: number }
+  | { ready: true; val_loss: number; iter: number; vocab_size: number; facts: number }
   | { ready: false; reason: string }
 
 /** Usage is per calendar day. Storing the date alongside the count means the
@@ -38,6 +38,10 @@ export default function App() {
   const [usage, setUsage] = useState(readUsage)
   const [plan, setPlan] = useState(() => localStorage.getItem('flow_plan') ?? 'free')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [showTeach, setShowTeach] = useState(false)
+  const [teachQ, setTeachQ] = useState('')
+  const [teachA, setTeachA] = useState('')
+  const [taught, setTaught] = useState('')
   const bottom = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -95,10 +99,15 @@ export default function App() {
           if (!frame.startsWith('data: ')) continue
           const data = frame.slice(6)
           if (data === '[DONE]') continue
-          const { t } = JSON.parse(data) as { t: string }
+          const { t, src } = JSON.parse(data) as { t: string; src?: 'memory' }
           setMessages((m) => {
             const copy = [...m]
-            copy[copy.length - 1] = { role: 'flow', text: copy[copy.length - 1].text + t }
+            const prev = copy[copy.length - 1]
+            copy[copy.length - 1] = {
+              role: 'flow',
+              text: prev.text + t,
+              src: src ?? prev.src ?? 'model',
+            }
             return copy
           })
         }
@@ -135,9 +144,13 @@ export default function App() {
               model ready · loss {health.val_loss}
             </span>
           )}
+          {health?.ready && <span className="pill">{health.facts} facts</span>}
           <span className={`pill ${plan === 'paid' ? 'paid' : ''}`}>
             {plan === 'paid' ? 'Unlimited' : `${left} left today`}
           </span>
+          <button className="chip" onClick={() => setShowTeach(true)}>
+            Teach Flow
+          </button>
         </div>
       </header>
 
@@ -161,7 +174,10 @@ export default function App() {
         )}
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
-            <span className="who">{m.role === 'you' ? 'You' : 'Flow'}</span>
+            <span className="who">
+              {m.role === 'you' ? 'You' : 'Flow'}
+              {m.src === 'memory' && <em className="tag" title="a fact Flow was taught">remembered</em>}
+            </span>
             <p>{m.text || (busy && i === messages.length - 1 ? '…' : '')}</p>
           </div>
         ))}
@@ -185,6 +201,63 @@ export default function App() {
           {busy ? '…' : 'Send'}
         </button>
       </footer>
+
+      {showTeach && (
+        <div className="modal" onClick={() => setShowTeach(false)}>
+          <div className="card" onClick={(e) => e.stopPropagation()}>
+            <h2>Teach Flow something</h2>
+            <p>
+              Flow's model is far too small to hold facts, so it keeps them in a database
+              instead. Anything you teach it, it knows straight away — no retraining.
+            </p>
+            <input
+              className="field"
+              placeholder="When someone asks…  e.g. what is my sister's name?"
+              value={teachQ}
+              onChange={(e) => setTeachQ(e.target.value)}
+            />
+            <input
+              className="field"
+              placeholder="Flow should say…  e.g. Your sister is Ariel."
+              value={teachA}
+              onChange={(e) => setTeachA(e.target.value)}
+            />
+            {taught && <p className="ok">{taught}</p>}
+            <div className="row">
+              <button
+                className="primary"
+                disabled={!teachQ.trim() || !teachA.trim()}
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${SERVER}/teach`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ question: teachQ, answer: teachA }),
+                    })
+                    const { facts } = (await res.json()) as { facts: number }
+                    setTaught(`Learned. Flow now knows ${facts} facts.`)
+                    setTeachQ('')
+                    setTeachA('')
+                    setHealth((h) => (h?.ready ? { ...h, facts } : h))
+                  } catch {
+                    setTaught("Couldn't reach the server. Is it running?")
+                  }
+                }}
+              >
+                Teach
+              </button>
+              <button
+                onClick={() => {
+                  setShowTeach(false)
+                  setTaught('')
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showUpgrade && (
         <div className="modal" onClick={() => setShowUpgrade(false)}>

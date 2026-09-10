@@ -12,6 +12,7 @@ import sys
 
 import torch
 
+from knowledge import look_up
 from model import FlowLM
 from tokenizer import WordTokenizer
 
@@ -93,6 +94,21 @@ def chat_stream(message, **kw):
 
 def generate(prompt, **kw):
     return "".join(stream(prompt, **kw))
+
+
+def answer(message, **kw):
+    """What Flow says, and where it came from.
+
+    The database is checked first. An 11M-parameter model cannot hold facts,
+    so anything it "remembers" is invented - a stored fact is always the
+    better answer when one exists. The model handles everything else.
+
+    Returns (text, source) where source is "memory" or "model".
+    """
+    fact, _ = look_up(message)
+    if fact:
+        return fact, "memory"
+    return "".join(chat_stream(message, **kw)).strip(), "model"
 
 
 def chat(message, **kw):

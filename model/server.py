@@ -49,8 +49,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 from sample import load
                 _, tok, meta = load()
+                from knowledge import count
                 body = {"ready": True, "val_loss": round(meta["val_loss"], 4),
-                        "iter": meta["iter"], "vocab_size": tok.vocab_size}
+                        "iter": meta["iter"], "vocab_size": tok.vocab_size,
+                        "facts": count()}
             except Exception as e:
                 body = {"ready": False, "reason": f"{type(e).__name__}: {e}"}
 
@@ -62,8 +64,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _json(self, body):
+        payload = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(payload)
+
     def do_POST(self):
-        if self.path != "/generate":
+        if self.path not in ("/generate", "/teach"):
             self.send_error(404)
             return
 
@@ -72,6 +83,17 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
             self.send_error(400, "bad JSON")
+            return
+
+        if self.path == "/teach":
+            from knowledge import count, teach
+            question = str(req.get("question", "")).strip()[:500]
+            fact = str(req.get("answer", "")).strip()[:1000]
+            if not question or not fact:
+                self.send_error(400, "need a question and an answer")
+                return
+            teach(question, fact)
+            self._json({"ok": True, "facts": count()})
             return
 
         prompt = str(req.get("prompt", ""))[:2000]
@@ -91,7 +113,20 @@ class Handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+        from knowledge import look_up
         from sample import chat_stream, stream
+
+        # Memory first. A stored fact beats a small model's guess every time,
+        # and it comes back instantly with no generation at all.
+        if as_chat:
+            fact, _ = look_up(prompt)
+            if fact:
+                frame = json.dumps({"t": fact, "src": "memory"})
+                self.wfile.write(f"data: {frame}\n\n".encode())
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
+                return
+
         producer = chat_stream if as_chat else stream
         try:
             with gen_lock:
