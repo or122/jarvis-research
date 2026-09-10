@@ -74,6 +74,48 @@ BASICS = [
     ("what is love?", "I think love is when you care about someone very much."),
 ]
 BASICS_REPEAT = 500
+
+# Asking for code should produce code, not a story. These teach the shape of a
+# coding answer: a question comes in, a code block comes out. The model is far
+# too small to be reliably correct, but the format has to be right before
+# anything else can be.
+CODE_QA = [
+    ("write a function that adds two numbers", "def add(a, b):\n    return a + b"),
+    ("how do i add two numbers in python?", "def add(a, b):\n    return a + b"),
+    ("write a hello world", 'print("Hello, world!")'),
+    ("write a function that says hello",
+     'def hello(name):\n    print("Hello, " + name)'),
+    ("how do i make a loop?", "for i in range(10):\n    print(i)"),
+    ("write a for loop", "for item in items:\n    print(item)"),
+    ("how do i make a list?", "numbers = [1, 2, 3, 4, 5]"),
+    ("write a function that doubles a number", "def double(n):\n    return n * 2"),
+    ("write a function that finds the biggest number",
+     "def biggest(numbers):\n    return max(numbers)"),
+    ("how do i count things in a list?", "count = len(items)\nprint(count)"),
+    ("write a function that reverses a string",
+     "def reverse(text):\n    return text[::-1]"),
+    ("how do i check if a number is even?",
+     "def is_even(n):\n    return n % 2 == 0"),
+    ("write a function that adds up a list",
+     "def total(numbers):\n    return sum(numbers)"),
+    ("how do i open a file?", 'with open("data.txt") as f:\n    text = f.read()'),
+    ("write a class",
+     "class Dog:\n    def __init__(self, name):\n        self.name = name"),
+    ("how do i use if?",
+     'if score > 10:\n    print("you win")\nelse:\n    print("try again")'),
+    ("write a function with a default value",
+     "def greet(name='friend'):\n    return 'Hello ' + name"),
+    ("how do i make a dictionary?", 'ages = {"Or": 10, "Ariel": 12}'),
+    ("write a function that squares a number", "def square(n):\n    return n * n"),
+    ("how do i sort a list?", "numbers.sort()\nprint(numbers)"),
+    ("write a function that counts to ten", "for i in range(1, 11):\n    print(i)"),
+    ("can you write code?",
+     "Yes! I can write small Python functions. Ask me for one."),
+    ("do you know python?",
+     "I learned from real Python files. I write small functions."),
+]
+CODE_REPEAT = 300
+
 MAX_LEN = 200          # one long monologue would swallow a 128-token window
 
 # A quote, then the words after it, so "said Tom" style attributions are
@@ -131,6 +173,13 @@ def main():
     turns += len(BASICS) * BASICS_REPEAT
     print(f"basics:  {len(BASICS)} patterns x {BASICS_REPEAT} = "
           f"{len(BASICS) * BASICS_REPEAT:,} turns")
+
+    for _ in range(CODE_REPEAT):
+        for user, reply in CODE_QA:
+            blocks.append(f"You: {user}\nMe: {reply}\n<|endoftext|>\n")
+    turns += len(CODE_QA) * CODE_REPEAT
+    print(f"code:    {len(CODE_QA)} patterns x {CODE_REPEAT} = "
+          f"{len(CODE_QA) * CODE_REPEAT:,} turns")
 
     with open(CORPUS, encoding="utf-8") as f:
         text = f.read()

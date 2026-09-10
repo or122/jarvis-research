@@ -183,7 +183,7 @@ if __name__ == "__main__":
     import math
 
     torch.manual_seed(1337)
-    vocab_size = 8192
+    vocab_size = 12288
     m = FlowLM(vocab_size)
     n_params = sum(p.numel() for p in m.parameters())
 
@@ -196,7 +196,9 @@ if __name__ == "__main__":
     print(f"logits shape:   {tuple(logits.shape)}  (expected (4, {BLOCK_SIZE}, {vocab_size}))")
     print(f"untrained loss: {loss.item():.4f}")
     print(f"ln({vocab_size}) =         {expected:.4f}")
-    # Window around ln(8192)=9.011: an untrained model must guess
-    # uniformly over the vocabulary, whatever size that vocabulary is.
-    ok = 8.7 < loss.item() < 9.3
+    # An untrained model must guess uniformly over the vocabulary, so its
+    # loss is ln(vocab_size) whatever that size is. Computed, not hardcoded:
+    # a stale hardcoded window from the old 65-character vocabulary already
+    # caused one false failure.
+    ok = abs(loss.item() - expected) < 0.3
     print(f"\nGATE 1 (wiring): {'PASS' if ok else 'FAIL'}")
