@@ -21,8 +21,11 @@ from tokenizer import DATA, WordTokenizer
 BATCH_SIZE = 32
 LEARNING_RATE = 6e-4      # measured 1484 tok/s, so CPU time is the constraint;
                           # warmup + gradient clipping make this rate safe
-EVAL_INTERVAL = 500
-EVAL_ITERS = 40
+# Both settable from the environment so a speed test can get numbers in
+# minutes instead of an hour. A 500-iteration gap between log lines hid a 4x
+# throughput collapse for over an hour.
+EVAL_INTERVAL = int(os.environ.get("FLOW_EVAL_EVERY", "500"))
+EVAL_ITERS = int(os.environ.get("FLOW_EVAL_ITERS", "40"))
 WARMUP_ITERS = 200        # ramp the rate up so early steps can't blow up
 MIN_LR = LEARNING_RATE / 10
 # Cosine decay: high rate early to explore, small rate late to settle. Worth a
