@@ -35,6 +35,11 @@ MAX_ITERS = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
 # Second argument picks the dataset: "" is the base story data, "chat_" is
 # the conversation data used for fine-tuning.
 PREFIX = sys.argv[2] if len(sys.argv) > 2 else ""
+# The cosine schedule's horizon, separate from where THIS run stops. Chunked
+# training calls train.py many times with a nearby MAX_ITERS; without this the
+# learning rate decayed to its minimum at the end of every chunk and sawtoothed
+# back up, so the model never got one long, smooth decay.
+TOTAL_ITERS = int(os.environ.get("FLOW_TOTAL_ITERS", "0")) or MAX_ITERS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CKPT = os.path.join(HERE, "ckpt.pt")
@@ -134,11 +139,11 @@ if __name__ == "__main__":
                 star = "  <- saved"
             print(f"iter {it:6d}   train {losses['train']:.4f}   "
                   f"val {losses['val']:.4f}   {mins:6.1f} min   "
-                  f"{tps:5.0f} tok/s  lr {lr_at(it, MAX_ITERS):.1e}{star}",
+                  f"{tps:5.0f} tok/s  lr {lr_at(it, TOTAL_ITERS):.1e}{star}",
                   flush=True)
 
         for g in optimizer.param_groups:
-            g["lr"] = lr_at(it, MAX_ITERS)
+            g["lr"] = lr_at(it, TOTAL_ITERS)
 
         x, y = get_batch("train")
         _, loss = model(x, y)

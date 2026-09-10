@@ -8,6 +8,7 @@ Run:  .venv/bin/python model/sample.py "hello"
       .venv/bin/python model/sample.py --continue "Once upon a time"
 """
 import os
+import re
 import sys
 
 import torch
@@ -51,8 +52,15 @@ def load():
     return _cache["model"], _cache["tok"], _cache["meta"]
 
 
-def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40, stops=STOPS):
-    """Yield decoded text as it is generated, ending at any stop sequence."""
+def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40, stops=STOPS,
+           min_new_tokens=0):
+    """Yield decoded text as it is generated, ending at any stop sequence.
+
+    min_new_tokens ignores stop sequences until that many tokens have been
+    produced. The chat data is full of short mined turns, so the model learned
+    to stop after about a dozen words - fine for "hello", useless for "tell me
+    a story". Every real chat model has the same control.
+    """
     model, tok, _ = load()
     ids = tok.encode(prompt) or [tok.stoi.get(" the", 256)]
     idx = torch.tensor([ids], dtype=torch.long)
@@ -61,12 +69,13 @@ def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40, stops=STOPS):
     # and a short tail is held back in case it turns out to be the beginning
     # of one. Without that, "\nYou" would be shown before ":" arrives.
     hold = max(len(s) for s in stops) - 1
-    buffer, sent = "", 0
+    buffer, sent, produced = "", 0, 0
 
     for token_id in model.generate(idx, max_new_tokens, temperature, top_k):
         buffer += tok.decode([token_id])
 
-        hits = [buffer.find(s) for s in stops]
+        produced += 1
+        hits = [] if produced < min_new_tokens else [buffer.find(s) for s in stops]
         hits = [h for h in hits if h != -1]
         if hits:
             stop_at = min(hits)
@@ -83,12 +92,46 @@ def stream(prompt, max_new_tokens=120, temperature=0.8, top_k=40, stops=STOPS):
         yield buffer[sent:]
 
 
+LONG_ASKS = ("story", "tell me about", "write about", "poem", "describe",
+             "imagine", "once upon")
+
+
+def story_opening(message):
+    """Turn a request into the first words of a story to continue from.
+
+    "tell me about a dragon" -> "Once upon a time there was a dragon." The
+    model then has something to carry on, which is exactly what its story and
+    book training taught it to do.
+    """
+    text = re.sub(r"^\s*(please\s+)?(can you\s+)?(tell|write|make)\s+"
+                  r"(me\s+)?(a|an|the)?\s*", "", message.strip(), flags=re.I)
+    text = re.sub(r"^(story|poem)\s*(about|of)?\s*", "", text, flags=re.I).strip(" .?!")
+    if text:
+        return f"Once upon a time there was {text}."
+    return "Once upon a time"
+
+
 def chat_stream(message, **kw):
     """Ask the model to reply, rather than to carry on writing.
 
     The prompt ends mid-line at "Me:" on purpose: the model's job is to
     complete that line, and completing it is a reply.
     """
+    # A story request is not a conversational turn. Forced to keep going in
+    # chat mode the model just writes both sides of another dialogue - it was
+    # trained on short mined turns, so that is what "more" means to it.
+    # Stories come from the story and book data instead, in continuation mode.
+    if any(k in message.lower() for k in LONG_ASKS):
+        kw.pop("min_new_tokens", None)
+        opening = story_opening(message)
+
+        def with_opening():
+            # The opening is part of the story, not hidden scaffolding -
+            # without it the reply starts mid-sentence on a comma.
+            yield opening
+            yield from stream(opening, stops=("<|", "\nYou:"), **kw)
+
+        return with_opening()
     return stream(f"You: {message}\nMe:", **kw)
 
 

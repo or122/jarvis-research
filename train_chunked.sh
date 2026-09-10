@@ -31,14 +31,17 @@ if [ "$(cat ACTIVE 2>/dev/null)" != "code" ]; then
 fi
 
 TARGET=$("$PY" -c "import torch;print(torch.load('ckpt.pt',map_location='cpu')['iter'])")
-echo "starting from iteration $TARGET"
+# Where the whole run ends, so the learning rate decays once across all the
+# chunks instead of resetting inside each one.
+FINAL=$(( TARGET + PER_CHUNK * CHUNKS ))
+echo "starting from iteration $TARGET, final target $FINAL"
 
 for i in $(seq 1 "$CHUNKS"); do
   TARGET=$(( TARGET + PER_CHUNK ))
   echo ""
   echo "=== chunk $i/$CHUNKS  ->  iteration $TARGET  ($(date +%H:%M)) ==="
 
-  FLOW_EVAL_EVERY=100 FLOW_EVAL_ITERS=20 \
+  FLOW_EVAL_EVERY=100 FLOW_EVAL_ITERS=20 FLOW_TOTAL_ITERS="$FINAL" \
     caffeinate -dimsu "$PY" -u train.py "$TARGET" all_ 2>&1 \
     | grep -E --line-buffered "^iter|best val|GATE"
 
