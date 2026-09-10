@@ -38,7 +38,8 @@ for i in $(seq 1 "$CHUNKS"); do
   echo ""
   echo "=== chunk $i/$CHUNKS  ->  iteration $TARGET  ($(date +%H:%M)) ==="
 
-  FLOW_EVAL_EVERY=200 caffeinate -i "$PY" -u train.py "$TARGET" all_ 2>&1 \
+  FLOW_EVAL_EVERY=100 FLOW_EVAL_ITERS=20 \
+    caffeinate -dimsu "$PY" -u train.py "$TARGET" all_ 2>&1 \
     | grep -E "^iter|best val|GATE"
 
   # Report the CPU's real speed after each chunk, so a thermal slide shows up
