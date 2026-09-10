@@ -18,11 +18,11 @@ from tokenizer import WordTokenizer
 HERE = os.path.dirname(os.path.abspath(__file__))
 CKPT = os.path.join(HERE, "ckpt.pt")
 
-# "<|" starts the end-of-story marker the corpus uses between its 155,520
-# stories; "\nYou:" is the start of the *user's* next turn, which the model
-# will happily write for you if nothing stops it. Both mean: this reply is
-# over. Every real chat model has the same pair of stop conditions.
-STOPS = ("<|", "\nYou:", "\nYou :")
+# Where a reply ends. "<|" begins the end-of-text marker the corpus uses
+# between documents; "\nYou:" is the user's next turn; "\nMe:" is a second
+# reply. Left alone, the model happily writes both sides of the conversation
+# forever. Every real chat model has the same kind of stop list.
+STOPS = ("<|", "\nYou:", "\nYou :", "\nMe:", "\nMe :")
 
 _cache = {}
 
