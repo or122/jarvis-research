@@ -32,6 +32,17 @@ def load():
     if "model" not in _cache:
         ckpt = torch.load(CKPT, map_location="cpu")
         tok = WordTokenizer.load()
+
+        # A checkpoint and a vocabulary that disagree is a silent disaster:
+        # every token id means something different, so the model emits fluent
+        # nonsense and nothing raises. Fail loudly instead.
+        if tok.vocab_size != ckpt["vocab_size"]:
+            raise SystemExit(
+                f"vocabulary mismatch: ckpt.pt was trained with "
+                f"vocab_size={ckpt['vocab_size']} but data/vocab.json has "
+                f"{tok.vocab_size}. They must come from the same training run."
+            )
+
         model = FlowLM(ckpt["vocab_size"])
         model.load_state_dict(ckpt["model"])
         model.eval()          # dropout off
