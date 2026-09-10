@@ -40,7 +40,7 @@ for i in $(seq 1 "$CHUNKS"); do
 
   FLOW_EVAL_EVERY=100 FLOW_EVAL_ITERS=20 \
     caffeinate -dimsu "$PY" -u train.py "$TARGET" all_ 2>&1 \
-    | grep -E "^iter|best val|GATE"
+    | grep -E --line-buffered "^iter|best val|GATE"
 
   # Report the CPU's real speed after each chunk, so a thermal slide shows up
   # immediately instead of after an hour of missing log lines.

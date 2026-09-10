@@ -31,6 +31,14 @@ DB = os.path.join(HERE, "data", "knowledge.db")
 # "what is your name" matching while rejecting unrelated questions.
 THRESHOLD = 0.5
 
+# A language name is not an ordinary keyword - it decides which answer is
+# correct at all. "write a function that adds two numbers" once matched the
+# JAVA snippet at 0.88, because "java" was the only difference and counted as
+# one word among six. Python answers were being replaced by Java ones, which
+# is why Python scored 0% through the app while the model alone scored 66.7%.
+LANGUAGES = {"java", "python", "javascript", "typescript", "c", "rust", "go",
+             "ruby", "php", "swift", "kotlin", "html", "css", "sql"}
+
 # Words that appear in almost every question and so carry no signal.
 STOP = {"a", "an", "the", "is", "are", "was", "were", "do", "does", "did",
         "can", "could", "will", "would", "i", "you", "me", "my", "your",
@@ -136,11 +144,21 @@ def look_up(question):
     rows = db.execute("SELECT question, answer FROM facts").fetchall()
     db.close()
 
+    asked_langs = asked & LANGUAGES
+
     best, best_score = None, 0.0
     for stored_q, answer in rows:
         stored = keywords(stored_q)
         if not stored:
             continue
+
+        # A fact about a specific language only answers a question about that
+        # same language. Asking for "a loop" must not return Java, and asking
+        # for a Java loop must not return the Python one.
+        stored_langs = stored & LANGUAGES
+        if stored_langs != asked_langs:
+            continue
+
         overlap = len(asked & stored)
         # Both directions matter: the stored fact must be well covered, and
         # the question must not be mostly about something else.
