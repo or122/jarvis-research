@@ -9,6 +9,7 @@ leaves the best model on disk.
 """
 import math
 import os
+import shutil
 import sys
 import time
 
@@ -43,6 +44,10 @@ TOTAL_ITERS = int(os.environ.get("FLOW_TOTAL_ITERS", "0")) or MAX_ITERS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CKPT = os.path.join(HERE, "ckpt.pt")
+# A second copy that is only ever written when the loss genuinely improves on
+# everything seen before. ckpt.pt is the working file a run resumes from;
+# ckpt_best.pt is the safety net, so a bad chunk can never destroy a good model.
+BEST = os.path.join(HERE, "ckpt_best.pt")
 
 torch.manual_seed(1337)
 
@@ -103,10 +108,14 @@ if __name__ == "__main__":
     if os.path.exists(CKPT):
         ck = torch.load(CKPT, map_location="cpu")
         model.load_state_dict(ck["model"])
-        # On a different dataset the old best_val is not comparable, so
-        # reset it — otherwise nothing would ever look like an improvement
-        # and no checkpoint would be saved.
-        best_val = float("inf") if PREFIX else ck["val_loss"]
+        # A different DATASET makes the old best_val incomparable, so it is
+        # reset then - but only then. Resetting whenever a prefix was set
+        # fired on every chunk of the same dataset, so the first eval of each
+        # chunk always overwrote the checkpoint even when it was worse. The
+        # model went backwards: chunk 8 reached 3.0243 and the next save put
+        # 3.0353 on disk.
+        same_dataset = ck.get("dataset", "") == PREFIX
+        best_val = ck["val_loss"] if same_dataset else float("inf")
         start_iter = ck["iter"]
         resumed = f"  (resumed from iter {start_iter}, val {best_val:.4f})"
 
@@ -135,8 +144,18 @@ if __name__ == "__main__":
                             "optim": optimizer.state_dict(),
                             "vocab_size": tok.vocab_size,
                             "val_loss": best_val,
+                            "dataset": PREFIX,
                             "iter": it}, CKPT)
                 star = "  <- saved"
+                # Mirror to the safety net only on a true all-time best.
+                prior = float("inf")
+                if os.path.exists(BEST):
+                    try:
+                        prior = torch.load(BEST, map_location="cpu")["val_loss"]
+                    except (RuntimeError, KeyError, EOFError):
+                        pass
+                if best_val < prior:
+                    shutil.copyfile(CKPT, BEST)
             print(f"iter {it:6d}   train {losses['train']:.4f}   "
                   f"val {losses['val']:.4f}   {mins:6.1f} min   "
                   f"{tps:5.0f} tok/s  lr {lr_at(it, TOTAL_ITERS):.1e}{star}",
