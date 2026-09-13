@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-const SERVER = 'http://localhost:8000'
+// location.hostname, not localhost: another device on the wifi reaches
+// this Mac by its address, and localhost would point at their own machine.
+const SERVER = `http://${location.hostname}:8000`
 const FREE_LIMIT = 20
 
 type Message = { role: 'you' | 'flow'; text: string; src?: 'memory' | 'model' }
@@ -30,7 +32,7 @@ function readHistory(): Message[] {
   }
 }
 
-export default function App() {
+export default function App({ onRooms }: { onRooms: () => void }) {
   const [messages, setMessages] = useState<Message[]>(readHistory)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -150,6 +152,9 @@ export default function App() {
           </span>
           <button className="chip" onClick={() => setShowTeach(true)}>
             Teach Flow
+          </button>
+          <button className="chip" onClick={onRooms}>
+            Rooms
           </button>
         </div>
       </header>
