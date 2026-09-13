@@ -1,117 +1,155 @@
-# Flow
+# Jarvis — a language model built from zero, on one laptop
 
-An AI chat app whose brain is a language model built and trained from zero on
-one MacBook Pro.
+I'm Or Gefen. I'm 10. I trained this language model myself, from nothing, on my
+MacBook — no API, no borrowed weights, no pretrained anything. Then I built an
+assistant on top of it.
 
-No Claude API. No OpenAI. No rented model. Every weight came out of code in
-this repository.
+It runs with the wifi off.
 
-## What Flow can honestly claim
+```
+You:  what is your name
+Jarvis: My name is Jarvis. I am Or's assistant.
 
-- **Free forever** — there is no API bill, so there is no per-message cost
-- **Works offline** — the model lives on the machine; turn the wifi off
-- **Completely private** — nothing typed ever leaves the computer
-- **Actually owned** — the tokenizer, the attention maths, the training loop
+You:  what is 89 times 47
+Jarvis: 4183
 
-## What Flow cannot do
+You:  open safari
+Jarvis: Opening Safari.          ← actually opens it
 
-It will not answer factual questions, follow instructions reliably, or reason.
-It is ~11 million parameters trained on one CPU. Claude is roughly ten thousand
-times larger and cost over $100M to train.
+You:  make me a game
+Jarvis: I can't build a game. That needs hundreds of lines of working
+        code and I write about ten. Ask Claude for that one.
+```
 
-What it does: fluent, grammatical, conversational English, and code-shaped
-Python. It sounds like someone talking without saying anything checkable.
+That last answer is the most important one in the repo. More on that below.
 
-Flow's marketing must never claim otherwise. "Private, offline, yours, free" is
-true. "As smart as Claude" is not, and would be a lie to users.
+---
+
+## What it is
+
+| | |
+|---|---|
+| **Model** | 11,070,976 parameters, decoder-only transformer, written by hand |
+| **Trained on** | 104.5M tokens: children's stories, classic books, Python source, mined conversations |
+| **Loss** | 9.51 → 2.59 (started at `ln(12288)` — pure random guessing) |
+| **Hardware** | One Intel MacBook Pro. No GPU. |
+| **Cost** | nothing |
+
+## How it works
+
+Most of what an assistant does isn't thinking. So the model is the **last**
+thing tried, not the first:
+
+```
+      you say something
+             ↓
+      1. a command?    →  real code runs it     always correct
+      2. a sum?        →  a calculator          always correct
+      3. a known fact? →  a database            always correct
+      4. anything else →  the model             sounds right, may be wrong
+```
+
+Because of that split, Jarvis scores **100% on maths** while the model alone
+scores **0%** — a neural network has never counted. Knowing which problems
+*not* to give the model turned out to matter as much as improving it.
+
+## Honest scores
+
+Measured by [`model/report_card.py`](model/report_card.py), which grades on
+randomly generated sums and on questions held out of the database, so nothing
+can be memorised.
+
+| Subject | Whole app | Model alone |
+|---|---|---|
+| Maths | 100% | 0% |
+| English | 89.9% | 89.9% |
+| Java | 83.3% | 20.0% |
+| Creativity | 78.9% | 78.9% |
+| Python | 66.7% | 66.7% |
+| **Overall** | **83.7%** | **51.1%** |
+
+> The first version of this test said 78/100. It was wrong — a four-word reply
+> scored 92.5% on English, and the Java test was grading answers I'd written
+> myself. Rebuilding it honestly dropped the score to 42%, and immediately
+> exposed a real bug. **An eval you can't fail teaches you nothing.**
+
+## What it cannot do
+
+It will not build you a game, an app or a website. It will not answer facts
+nobody taught it. It cannot reason.
+
+It's 11 million parameters. Claude is roughly ten thousand times bigger and
+cost over $100M to train. That gap doesn't close on a laptop, and this repo
+never pretends otherwise — Jarvis is taught to say so out loud.
 
 ## Run it
 
-Two processes. The model is PyTorch so inference must be Python; everything
-else is TypeScript.
-
-```bash
-# terminal 1 — the model
-.venv/bin/python model/server.py
-
-# terminal 2 — the app
-cd web && npm run dev      # http://localhost:5173
-```
-
-First-time setup:
-
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt      # torch 2.2.2, numpy
+
+# the assistant, in your terminal
+.venv/bin/python model/jarvis.py "what time is it"
+
+# the chat app
+cd model && ../.venv/bin/python server.py      # terminal 1
+cd web && npm install && npm run dev           # terminal 2 -> localhost:5173
 ```
 
 `torch` is pinned to **2.2.2** — the last version with a macOS Intel build.
 
-## Build the model from scratch
+> The trained weights aren't in the repo (they're 130 MB). Train your own with
+> the steps below, or ask me for the checkpoint.
+
+## Build the model yourself
+
+Every step, from an empty folder to a talking model:
 
 ```bash
 .venv/bin/python model/download_corpus.py      # 138 MB of stories
-.venv/bin/python model/build_code_corpus.py    # 31 MB of Python from this Mac
-.venv/bin/python model/build_chat_corpus.py    # 151k conversation turns
+.venv/bin/python model/build_code_corpus.py    # Python from your own machine
+.venv/bin/python model/build_chat_corpus.py    # 151,695 conversation turns
+.venv/bin/python model/build_jarvis_corpus.py  # 33,000 assistant turns
 .venv/bin/python model/tokenizer.py            # 12,288-word vocabulary
-.venv/bin/python model/prepare_all_tokens.py   # 74.5M tokens
-caffeinate -i .venv/bin/python model/train.py 6000 all_
-.venv/bin/python model/eval.py                 # 3 gates
-.venv/bin/python model/eval_code.py            # 4 code gates
+.venv/bin/python model/prepare_all_tokens.py   # 104.5M tokens
+./train_chunked.sh 400 20                      # train in bursts
+.venv/bin/python model/report_card.py          # score it
 ```
 
-## How it works
+`train_chunked.sh` trains ~35 minutes then rests 15. That isn't fussiness:
+running flat out, this laptop fell from 190 to 28 GFLOPS and effectively
+stopped. Chunked, it holds ~2,000 tokens/sec. **Same code, 4x the throughput,
+purely from letting it cool.**
+
+## What's in here
 
 | File | Job |
 |---|---|
-| `model/tokenizer.py` | Words ↔ numbers. 12,032 words + 256 byte fallbacks |
-| `model/model.py` | `Head` → `MultiHeadAttention` → `FeedForward` → `Block` → `FlowLM` |
-| `model/train.py` | Training loop, warmup, cosine decay, resumes from checkpoint |
-| `model/sample.py` | Generation, chat mode, stop sequences |
-| `model/server.py` | Streaming HTTP server, standard library only |
-| `model/eval.py` | The gates. Exit 1 = not done |
-| `web/src/App.tsx` | The chat interface, free/paid tiers |
+| `model/model.py` | `Head` -> `MultiHeadAttention` -> `FeedForward` -> `Block` -> `FlowLM` |
+| `model/tokenizer.py` | Words <-> numbers. 12,032 words + 256 byte fallbacks |
+| `model/train.py` | Training loop: warmup, cosine decay, resumable checkpoints |
+| `model/jarvis.py` | The assistant — 15 real commands, swappable brain |
+| `model/knowledge.py` | Facts database. Where Jarvis's identity actually lives |
+| `model/maths.py` | The calculator. Safe expression evaluation, never `eval()` |
+| `model/rooms.py` | Shared rooms with paid seats |
+| `model/report_card.py` | The honest test |
+| `web/` | React + TypeScript chat interface |
 
-The model is a decoder-only transformer — the same family as GPT and Claude,
-scaled down about ten thousand times.
+## Things I learned the hard way
 
-```
-vocab 12,288   context 128 tokens   n_embd 256
-n_head 8       n_layer 6            11.07M parameters
-```
+- **`<|endoftext|>` in the output wasn't a bug.** The corpus separates its
+  155,520 stories with it, so the model was right to learn it. The fix was
+  treating it as a stop signal — what every real LLM does.
+- **A model has no idea when to stop.** Left alone it writes your next message
+  too, then answers itself forever. Stopping is the program's job.
+- **A model has no idea what it can do either.** Asked "can you build an app"
+  it said yes, because agreement is a likely next word. Honesty has to be
+  written down, not hoped for.
+- **CPU% tells you a process is busy, never that it's fast.** Comparing
+  CPU-time against wall-time is what exposed both the thermal throttling and
+  the laptop silently sleeping through training.
+- **Never edit a running shell script.** Bash reads it as it goes.
 
-## Training data
+## Licence
 
-| Source | Size | Why |
-|---|---|---|
-| TinyStories | 133 MB | Simple, clean English. ~10M-parameter models produce coherent text on it |
-| Project Gutenberg | 4 MB | Real sentence variety |
-| Python stdlib + packages | 31 MB | 2,679 files already on this Mac. Learn what code looks like |
-| Mined conversations | 17 MB | 151,695 turns, so Flow replies instead of rambling |
-
-Mixed into 74.5M training tokens: 49% stories, 30% code, 21% chat.
-
-## The two-stage recipe
-
-Flow is trained the way every chat model is:
-
-1. **Pretrain** — learn language from a large pile of text
-2. **Fine-tune** — learn the shape of a conversation from `You:` / `Me:` pairs
-
-Conversations are oversampled so they keep a meaningful share of what the model
-sees, and story text is kept in the mix so its English does not erode. That
-second trick is called **replay**, and skipping it is a classic way to ruin a
-fine-tune.
-
-## Pricing
-
-Free tier: 20 messages a day. Paid: unlimited.
-
-**No real payments in v1, on purpose.** The seat limit and the upgrade screen
-are real; who counts as "paid" is a flag flipped by hand. Real money is v2, and
-payments are a hot zone — ask before touching.
-
-## Not in v1
-
-Rooms, invites, other people, accounts, file uploads, deploying to the
-internet. Rooms and per-seat pricing are v2.
+MIT. Take any of it.

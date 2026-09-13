@@ -6,3 +6,6 @@ model/data/*.txt
 model/data/*.bin
 dist/
 model/data/rooms.db
+.env
+.env.*
+*.log
