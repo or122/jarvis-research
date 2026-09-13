@@ -150,6 +150,21 @@ purely from letting it cool.**
   the laptop silently sleeping through training.
 - **Never edit a running shell script.** Bash reads it as it goes.
 
+## About me
+
+I'm Or Gefen. I'm 10, and I live in Israel.
+
+I like building things people say are too hard. I wanted my own language model
+— not an app that calls someone else's — so I trained one. It took three days,
+my laptop got very hot, and it works.
+
+I'm not trying to beat Claude. I'm trying to understand how it actually works
+by building a small one myself, then a better one, then a better one after
+that. This is a project I plan to keep working on for years. I have time.
+
+Almost everything in the "learned the hard way" list above, I learned by
+getting it wrong first.
+
 ## Licence
 
 MIT. Take any of it.
