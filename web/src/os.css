@@ -385,3 +385,94 @@
 
 .os-badge.elec { color: #80ed99; border-color: rgba(128, 237, 153, 0.4); }
 .os-badge.petrol { color: #ff9e00; border-color: rgba(255, 158, 0, 0.4); }
+
+/* --- how sure Jarvis is, made visible ---------------------------------
+ * A stored fact and a guess from an 11M-parameter model must not look
+ * equally authoritative. Solid and bright means certain; faded and dashed
+ * means the model is guessing and you should check it.
+ */
+.os-caption.conf-certain {
+  border-color: rgba(128, 237, 153, 0.5);
+  box-shadow: 0 0 34px rgba(128, 237, 153, 0.12);
+}
+
+.os-caption.conf-strong {
+  border-color: rgba(255, 158, 0, 0.5);
+  box-shadow: 0 0 34px rgba(255, 158, 0, 0.12);
+}
+
+/* A guess is deliberately quieter and dashed — it should not feel settled. */
+.os-caption.conf-guess {
+  border-style: dashed;
+  border-color: rgba(140, 160, 190, 0.45);
+  box-shadow: none;
+  color: #a9bbd0;
+}
+
+/* --- correcting Jarvis ------------------------------------------------- */
+.os-wrong {
+  display: block;
+  margin-top: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--os-muted);
+  cursor: pointer;
+}
+.os-wrong:hover { color: var(--os-violet); }
+
+.os-fix { margin-top: 12px; }
+.os-fix label {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--os-violet);
+  margin-bottom: 6px;
+}
+.os-fix input {
+  width: 100%;
+  background: rgba(4, 8, 16, 0.9);
+  border: 1px solid var(--os-line);
+  color: var(--os-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 9px 12px;
+}
+.os-fix input:focus { outline: none; border-color: var(--os-violet); }
+
+.os-fix-row { display: flex; gap: 8px; margin-top: 8px; }
+.os-fix-go {
+  background: rgba(199, 125, 255, 0.16);
+  border: 1px solid var(--os-violet);
+  color: var(--os-violet);
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.os-fix-go:disabled { opacity: 0.35; cursor: default; }
+.os-fix-no {
+  background: none;
+  border: none;
+  color: var(--os-muted);
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.os-fix-no:hover { color: var(--os-text); }
+
+.os-fixed {
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: #80ed99;
+  letter-spacing: 0.04em;
+}

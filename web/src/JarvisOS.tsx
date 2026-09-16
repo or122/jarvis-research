@@ -16,6 +16,26 @@ type Health = {
   petrol_model?: string
 }
 
+/** How much to trust each source, and what to call it.
+ *  certain = real code or a stored fact, and cannot be wrong
+ *  strong  = a frontier model, usually right
+ *  guess   = the 11M-parameter model, frequently wrong */
+const CONFIDENCE: Record<string, string> = {
+  memory: 'certain',
+  command: 'certain',
+  opus: 'strong',
+  fable: 'strong',
+  flow: 'guess',
+}
+
+const LABEL: Record<string, string> = {
+  memory: '🔋 remembered · certain',
+  command: '⚙ ran it · certain',
+  opus: '⛽ Claude Opus',
+  fable: '⛽ Claude Fable',
+  flow: '🔋 my small model · a guess',
+}
+
 export default function JarvisOS({ onExit }: { onExit: () => void }) {
   const [brain, setBrain] = useState<Brain | null>(null)
   const [health, setHealth] = useState<Health | null>(null)
@@ -27,6 +47,12 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
   const [reply, setReply] = useState('')
   // Which engine answered, so the dashboard can show it.
   const [engine, setEngine] = useState<string>('')
+  // The question that produced the current reply. A correction has to teach
+  // Jarvis the answer to THAT question, so it must survive the input clearing.
+  const [asked, setAsked] = useState('')
+  const [fixing, setFixing] = useState(false)
+  const [fix, setFix] = useState('')
+  const [fixed, setFixed] = useState('')
   const [busy, setBusy] = useState(false)
   const pulse = useRef(0)
 
@@ -56,6 +82,9 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
     setBusy(true)
     setReply('')
     setEngine('')
+    setAsked(prompt)
+    setFixing(false)
+    setFixed('')
     try {
       const res = await fetch(`${SERVER}/generate`, {
         method: 'POST',
@@ -87,6 +116,30 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
       setReply('Connection lost.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** Correcting Jarvis teaches Jarvis - the correction becomes a stored fact,
+   *  so the same question is answered from memory next time. */
+  async function teachCorrection() {
+    const answer = fix.trim()
+    if (!answer || !asked) return
+    try {
+      const res = await fetch(`${SERVER}/teach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: asked, answer }),
+      })
+      const { facts } = (await res.json()) as { facts: number }
+      setFixed(`Learned. Jarvis now knows ${facts} facts.`)
+      setReply(answer)
+      setEngine('memory')
+      setFix('')
+      setFixing(false)
+      load()                       // the new fact is a new node on the graph
+      setHealth((h) => (h ? { ...h, facts } : h))
+    } catch {
+      setFixed('Could not save that.')
     }
   }
 
@@ -186,22 +239,47 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
           </div>
         )}
 
-        {/* the reply, as a caption under the graph */}
+        {/* The reply. How sure Jarvis is changes how it LOOKS - a stored fact
+            and an 11M-parameter guess must not appear equally authoritative,
+            which is the "false confidence" trust research warns about. */}
         {(reply || busy) && (
-          <div className="os-caption">
+          <div className={`os-caption conf-${CONFIDENCE[engine] ?? 'guess'}`}>
             <span className="os-caption-who">
               JARVIS
-              {engine && (
-                <em className={`os-engine ${engine}`}>
-                  {engine === 'fable'
-                    ? '⛽ petrol · Fable'
-                    : engine === 'memory'
-                      ? '🔋 memory'
-                      : '🔋 electric · Flow'}
-                </em>
-              )}
+              {engine && <em className={`os-engine ${engine}`}>{LABEL[engine] ?? LABEL.flow}</em>}
             </span>
             {reply || '…'}
+
+            {/* Every answer can be corrected. That is the strongest trust
+                finding, and here the correction also teaches Jarvis. */}
+            {reply && !busy && !fixing && !fixed && (
+              <button className="os-wrong" onClick={() => setFixing(true)}>
+                ✎ that's wrong
+              </button>
+            )}
+
+            {fixing && (
+              <div className="os-fix">
+                <label>What should Jarvis have said?</label>
+                <input
+                  autoFocus
+                  value={fix}
+                  placeholder="The right answer…"
+                  onChange={(e) => setFix(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && teachCorrection()}
+                />
+                <div className="os-fix-row">
+                  <button className="os-fix-go" disabled={!fix.trim()} onClick={teachCorrection}>
+                    Teach it
+                  </button>
+                  <button className="os-fix-no" onClick={() => setFixing(false)}>
+                    cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {fixed && <div className="os-fixed">✓ {fixed}</div>}
           </div>
         )}
 
