@@ -7,7 +7,14 @@ const SERVER = `http://${location.hostname}:8000`
 type Group = { group: string; colour: string; count: number }
 type Hub = { label: string; degree: number; colour: string }
 type Brain = { nodes: Node[]; links: Link[]; groups: Group[]; hubs: Hub[] }
-type Health = { ready: boolean; val_loss?: number; iter?: number; facts?: number }
+type Health = {
+  ready: boolean
+  val_loss?: number
+  iter?: number
+  facts?: number
+  petrol?: boolean
+  petrol_model?: string
+}
 
 export default function JarvisOS({ onExit }: { onExit: () => void }) {
   const [brain, setBrain] = useState<Brain | null>(null)
@@ -18,6 +25,8 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
   const [linkLength, setLinkLength] = useState(70)
   const [input, setInput] = useState('')
   const [reply, setReply] = useState('')
+  // Which engine answered, so the dashboard can show it.
+  const [engine, setEngine] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const pulse = useRef(0)
 
@@ -46,6 +55,7 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
     setInput('')
     setBusy(true)
     setReply('')
+    setEngine('')
     try {
       const res = await fetch(`${SERVER}/generate`, {
         method: 'POST',
@@ -65,7 +75,8 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
           if (!f.startsWith('data: ')) continue
           const d = f.slice(6)
           if (d === '[DONE]') continue
-          const { t } = JSON.parse(d) as { t: string }
+          const { t, src } = JSON.parse(d) as { t: string; src?: string }
+          if (src) setEngine(src)
           setReply((r) => r + t)
           pulse.current++
         }
@@ -178,7 +189,18 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
         {/* the reply, as a caption under the graph */}
         {(reply || busy) && (
           <div className="os-caption">
-            <span className="os-caption-who">JARVIS</span>
+            <span className="os-caption-who">
+              JARVIS
+              {engine && (
+                <em className={`os-engine ${engine}`}>
+                  {engine === 'fable'
+                    ? '⛽ petrol · Fable'
+                    : engine === 'memory'
+                      ? '🔋 memory'
+                      : '🔋 electric · Flow'}
+                </em>
+              )}
+            </span>
             {reply || '…'}
           </div>
         )}
@@ -242,7 +264,10 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
             <span className={`os-badge ${health?.ready ? 'on' : 'off'}`}>
               ● {health?.ready ? 'ONLINE' : 'OFFLINE'}
             </span>
-            <span className="os-badge">FLOW 1.0</span>
+            <span className="os-badge elec">🔋 FLOW</span>
+            <span className={`os-badge ${health?.petrol ? 'petrol' : 'off'}`}>
+              ⛽ {health?.petrol ? 'FABLE' : 'NO KEY'}
+            </span>
           </div>
           {health?.ready && (
             <div className="os-stats">
