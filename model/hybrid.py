@@ -20,6 +20,38 @@ import os
 import re
 import sys
 
+# --- the key -------------------------------------------------------------
+# Read from ~/flow/.env if it is there. That file is in .gitignore, so a key
+# kept in it cannot be committed or pushed by accident - which is the whole
+# reason for reading it from a file rather than hardcoding it anywhere.
+#
+# An environment variable still wins, so `export ANTHROPIC_API_KEY=...` or a
+# CI secret overrides the file without editing it.
+ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        ".env")
+
+
+def _load_env_file(path=ENV_FILE):
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name, _, value = line.partition("=")
+                name = name.strip()
+                # Quotes are stripped because copying a key often brings them.
+                value = value.strip().strip('"').strip("'")
+                if name and value and name not in os.environ:
+                    os.environ[name] = value
+    except OSError:
+        pass        # an unreadable .env must never stop Jarvis starting
+
+
+_load_env_file()
+
 # claude-fable-5-1 is Or's explicit choice: Anthropic's most capable model.
 # It is also the most expensive at $10/$50 per million tokens, which is why
 # the router below sends as little to it as possible.
