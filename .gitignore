@@ -10,3 +10,4 @@ model/data/rooms.db
 .env.*
 *.log
 .claude/
+!.env.example
