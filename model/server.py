@@ -44,6 +44,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/rooms/"):
             self.handle_room_get()
             return
+        if self.path == "/brain":
+            # Rebuilt per request rather than cached: the graph must change the
+            # moment someone teaches Jarvis something, and 62 facts is trivial
+            # to recompute.
+            from brain_graph import build
+            self._json(build())
+            return
         if self.path != "/health":
             self.send_error(404)
             return
