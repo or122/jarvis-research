@@ -137,18 +137,24 @@ class Handler(BaseHTTPRequestHandler):
         # Memory first. A stored fact beats a small model's guess every time,
         # and it comes back instantly with no generation at all.
         if as_chat:
-            fact, _ = look_up(prompt)
-            if fact:
-                frame = json.dumps({"t": fact, "src": "memory"})
-                self.wfile.write(f"data: {frame}\n\n".encode())
-                self.wfile.write(b"data: [DONE]\n\n")
-                self.wfile.flush()
-                return
+            from hybrid import (ask_petrol, is_production_request, needs_petrol,
+                                petrol_available)
+
+            # A request to PRODUCE something skips the database. Asked to
+            # "write me a function that sorts a list", the fuzzy match returned
+            # its definition of the word "function" - a real answer to a
+            # question nobody asked. Definitions answer "what is", not "write".
+            if not is_production_request(prompt):
+                fact, _ = look_up(prompt)
+                if fact:
+                    frame = json.dumps({"t": fact, "src": "memory"})
+                    self.wfile.write(f"data: {frame}\n\n".encode())
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+                    return
 
             # The hybrid: the petrol engine only for what the electric one
             # cannot do, so ordinary chat stays free and offline.
-            from hybrid import ask_petrol, needs_petrol, petrol_available
-
             petrol, why = needs_petrol(prompt)
             if petrol and petrol_available():
                 self.wfile.write(
@@ -168,7 +174,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Fall through to the small model rather than leaving the
                     # user with nothing.
                     with gen_lock:
-                        for piece in chat_stream(prompt, max_tokens, temperature):
+                        for piece in chat_stream(prompt, max_new_tokens=max_tokens,
+                                                 temperature=temperature):
                             self.wfile.write(
                                 f"data: {json.dumps({'t': piece, 'src': 'flow'})}\n\n".encode())
                             self.wfile.flush()
@@ -179,7 +186,8 @@ class Handler(BaseHTTPRequestHandler):
         producer = chat_stream if as_chat else stream
         try:
             with gen_lock:
-                for piece in producer(prompt, max_tokens, temperature):
+                for piece in producer(prompt, max_new_tokens=max_tokens,
+                                      temperature=temperature):
                     # SSE frame: "data: {json}\n\n". JSON-encoding the text
                     # keeps newlines from breaking the frame format.
                     self.wfile.write(f"data: {json.dumps({'t': piece})}\n\n".encode())

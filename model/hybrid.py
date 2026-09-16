@@ -50,6 +50,19 @@ PETROL_WORDS = (
 # Explicitly summoning the petrol engine.
 FORCE_PETROL = re.compile(r"^\s*(ask\s+)?(claude|fable)[,:]?\s+", re.I)
 
+# Asking Jarvis to PRODUCE something, as opposed to asking what something is.
+# This distinction matters because the facts database will happily answer
+# "write me a function that sorts a list" with its definition of the word
+# "function" - a real answer to a question nobody asked. Production requests
+# skip the database entirely.
+PRODUCE = re.compile(
+    r"\b(write|build|make|create|generate|fix|debug|refactor|implement|"
+    r"show me how to)\b", re.I)
+
+
+def is_production_request(text):
+    return bool(PRODUCE.search(text))
+
 
 def needs_petrol(text):
     """Decide which engine answers. Returns (petrol: bool, why: str)."""
