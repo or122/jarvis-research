@@ -9,3 +9,4 @@ model/data/rooms.db
 .env
 .env.*
 *.log
+.claude/
