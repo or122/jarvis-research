@@ -158,7 +158,7 @@ export default function App({ onRooms, onHud }:
             Rooms
           </button>
           <button className="chip" onClick={onHud}>
-            Jarvis
+            Jarvis OS
           </button>
         </div>
       </header>

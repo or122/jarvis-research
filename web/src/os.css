@@ -1,0 +1,365 @@
+/* JARVIS OS — a workstation for a brain.
+ *
+ * Three columns: controls, the graph, filters. The graph is the whole point,
+ * so it gets all the space and the panels stay narrow and quiet.
+ *
+ * Violet for the interface, and every other colour reserved for the node
+ * categories. If the chrome competed with the graph you could not read the
+ * clusters, which are the only thing here carrying information.
+ */
+
+:root {
+  --os-bg: #05070f;
+  --os-panel: rgba(10, 14, 26, 0.86);
+  --os-line: rgba(140, 120, 220, 0.18);
+  --os-violet: #c77dff;
+  --os-violet-dim: #7b5ea7;
+  --os-text: #dfe6f5;
+  --os-muted: #6d7894;
+}
+
+* { box-sizing: border-box; }
+
+.os {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 230px 1fr 210px;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 45%, #0a1226 0%, transparent 70%),
+    var(--os-bg);
+  color: var(--os-text);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- panels */
+.os-panel {
+  background: var(--os-panel);
+  backdrop-filter: blur(8px);
+  overflow-y: auto;
+  padding: 14px 14px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--os-violet-dim) transparent;
+}
+.os-left { border-right: 1px solid var(--os-line); }
+.os-right {
+  border-left: 1px solid var(--os-line);
+  display: flex;
+  flex-direction: column;
+}
+
+.os-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--os-violet);
+  text-shadow: 0 0 12px rgba(199, 125, 255, 0.55);
+}
+.os-x {
+  background: none;
+  border: none;
+  color: var(--os-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+}
+.os-x:hover { color: var(--os-violet); }
+
+.os-sub {
+  font-size: 10px;
+  color: var(--os-muted);
+  margin-top: 3px;
+  letter-spacing: 0.06em;
+}
+
+.os-block { margin-top: 22px; }
+.os-block h4 {
+  margin: 0 0 9px;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--os-muted);
+  border-bottom: 1px solid var(--os-line);
+  padding-bottom: 5px;
+}
+
+.os-hint { color: var(--os-muted); font-size: 10.5px; line-height: 1.7; margin: 0; }
+
+/* ------------------------------------------------------------ inspector */
+.os-inspect { font-size: 11px; line-height: 1.6; }
+.os-q { color: var(--os-violet); margin: 5px 0 6px; }
+.os-a { color: var(--os-text); opacity: 0.85; }
+.os-meta {
+  margin-top: 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--os-muted);
+}
+.os-btn-sm {
+  margin-top: 9px;
+  background: none;
+  border: 1px solid var(--os-line);
+  color: var(--os-muted);
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.os-btn-sm:hover { color: var(--os-violet); border-color: var(--os-violet); }
+
+.os-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.os-dot.sm { width: 7px; height: 7px; }
+
+/* ----------------------------------------------------------------- hubs */
+.os-hub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  font-size: 10.5px;
+}
+.os-hub-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--os-text);
+  opacity: 0.8;
+}
+.os-hub-n { color: var(--os-violet); font-size: 10px; }
+
+/* -------------------------------------------------------------- sliders */
+.os-slider { display: block; margin-bottom: 12px; }
+.os-slider span {
+  display: block;
+  font-size: 10px;
+  color: var(--os-muted);
+  margin-bottom: 5px;
+}
+.os-slider input {
+  width: 100%;
+  accent-color: var(--os-violet);
+  height: 2px;
+}
+
+/* -------------------------------------------------------------- filters */
+.os-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--os-text);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 5px 2px;
+  cursor: pointer;
+  text-align: left;
+}
+.os-filter:hover { color: var(--os-violet); }
+/* Hidden groups stay visible but dimmed, so you can always see what you
+   switched off — a vanished row is easy to forget about. */
+.os-filter.off { opacity: 0.3; }
+.os-filter-name { flex: 1; text-transform: capitalize; }
+.os-filter-n { color: var(--os-muted); }
+
+.os-showing {
+  margin-top: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--os-violet);
+}
+
+/* ---------------------------------------------------------------- stage */
+.os-stage { position: relative; overflow: hidden; }
+.brain-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+.os-offline {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--os-muted);
+  letter-spacing: 0.22em;
+  font-size: 11px;
+  gap: 8px;
+}
+
+.os-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 74px;
+  transform: translateX(-50%);
+  max-width: 76%;
+  padding: 11px 17px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--os-text);
+  background: rgba(8, 12, 24, 0.92);
+  border: 1px solid rgba(199, 125, 255, 0.35);
+  box-shadow: 0 0 34px rgba(199, 125, 255, 0.14);
+  clip-path: polygon(0 9px, 9px 0, 100% 0, 100% calc(100% - 9px),
+                     calc(100% - 9px) 100%, 0 100%);
+  animation: cap-in 0.24s ease-out;
+}
+.os-caption-who {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  color: var(--os-violet);
+  margin-bottom: 5px;
+}
+@keyframes cap-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.os-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 9px;
+  width: min(560px, 82%);
+}
+.os-bar input {
+  flex: 1;
+  background: rgba(8, 12, 24, 0.94);
+  border: 1px solid var(--os-line);
+  color: var(--os-text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 11px 15px;
+  clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px),
+                     calc(100% - 8px) 100%, 0 100%);
+}
+.os-bar input::placeholder { color: var(--os-muted); }
+.os-bar input:focus {
+  outline: none;
+  border-color: var(--os-violet);
+  box-shadow: 0 0 22px rgba(199, 125, 255, 0.22);
+}
+.os-bar button {
+  background: rgba(199, 125, 255, 0.12);
+  border: 1px solid var(--os-violet);
+  color: var(--os-violet);
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0 18px;
+  cursor: pointer;
+  clip-path: polygon(0 8px, 8px 0, 100% 0, 100% calc(100% - 8px),
+                     calc(100% - 8px) 100%, 0 100%);
+}
+.os-bar button:hover:not(:disabled) { background: rgba(199, 125, 255, 0.24); }
+.os-bar button:disabled { opacity: 0.35; cursor: default; }
+
+/* ----------------------------------------------------------------- ring */
+.os-ring-wrap { margin-top: auto; padding-top: 24px; text-align: center; }
+
+.os-ring {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto;
+}
+.os-ring svg { width: 100%; height: 100%; overflow: visible; }
+
+.r-line { fill: none; stroke: var(--os-violet); stroke-width: 1; opacity: 0.5; }
+.r-dash  { stroke-dasharray: 30 14; opacity: 0.75; animation: r-spin 15s linear infinite; transform-origin: 50% 50%; }
+.r-dash2 { stroke-dasharray: 10 20; opacity: 0.55; animation: r-spin 9s linear infinite reverse; transform-origin: 50% 50%; }
+.r-tick { stroke: var(--os-violet); stroke-width: 1; opacity: 0.4; }
+
+.os-ring-core {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #fff, var(--os-violet) 55%, #5b3d80 100%);
+  box-shadow: 0 0 22px var(--os-violet), 0 0 52px rgba(199, 125, 255, 0.55);
+  animation: r-breathe 3.4s ease-in-out infinite;
+}
+/* The ring is the status light: it speeds up while Jarvis is answering. */
+.os-ring.busy .os-ring-core { animation-duration: 0.7s; }
+.os-ring.busy .r-dash { animation-duration: 3s; }
+
+.os-ring-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: var(--os-violet);
+  text-shadow: 0 0 10px rgba(199, 125, 255, 0.7);
+}
+
+@keyframes r-spin { to { transform: rotate(360deg); } }
+@keyframes r-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.85; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+
+.os-badges {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.os-badge {
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  padding: 3px 8px;
+  border: 1px solid var(--os-line);
+  color: var(--os-muted);
+}
+.os-badge.on { color: #80ed99; border-color: rgba(128, 237, 153, 0.4); }
+.os-badge.off { color: #ff9e00; border-color: rgba(255, 158, 0, 0.4); }
+
+.os-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 9px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--os-muted);
+}
+.os-stats b { color: var(--os-text); font-weight: 500; }
+
+/* On a narrow window the panels would squeeze the graph into a strip, so the
+   right column goes first — filters matter less than being able to see it. */
+@media (max-width: 1000px) {
+  .os { grid-template-columns: 200px 1fr; }
+  .os-right { display: none; }
+}
+@media (max-width: 720px) {
+  .os { grid-template-columns: 1fr; }
+  .os-left { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .r-dash, .r-dash2, .os-ring-core { animation: none !important; }
+}
