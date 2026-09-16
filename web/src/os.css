@@ -378,9 +378,52 @@
   color: #80ed99;
   background: rgba(128, 237, 153, 0.12);
 }
-.os-engine.fable {
+.os-engine.fable,
+.os-engine.opus {
   color: #ff9e00;
   background: rgba(255, 158, 0, 0.14);
+}
+/* The agent gets its own colour because it is a different KIND of answer:
+   the others produce words, this one produces files. */
+.os-engine.agent {
+  color: #7cc6ff;
+  background: rgba(124, 198, 255, 0.14);
+}
+
+/* --- the agent at work ------------------------------------------------ */
+.os-status {
+  display: block;
+  margin: 6px 0 2px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #7cc6ff;
+  opacity: 0.85;
+}
+
+/* What it left behind. Naming the files is what makes "I built it" a claim
+   Or can actually check. */
+.os-built {
+  margin-top: 12px;
+  padding: 8px 11px;
+  border-left: 2px solid rgba(124, 198, 255, 0.55);
+  background: rgba(124, 198, 255, 0.06);
+}
+.os-built-head {
+  display: block;
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7cc6ff;
+}
+.os-built-head em {
+  font-style: normal;
+  opacity: 0.7;
+}
+.os-built ul {
+  margin: 5px 0 0;
+  padding-left: 15px;
+  font-size: 11.5px;
+  color: #cfe3f7;
 }
 
 .os-badge.elec { color: #80ed99; border-color: rgba(128, 237, 153, 0.4); }

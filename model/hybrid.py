@@ -99,6 +99,40 @@ def is_production_request(text):
     return bool(PRODUCE.search(text))
 
 
+# --- the third engine: the agent, which writes real files ----------------
+# Petrol answers in the chat. The agent puts a file on the disk. The question
+# that separates them is not "is this about code" but "does this ask for a
+# file to EXIST": "write me a bubble sort" wants a snippet to read, while
+# "build me a game" wants something that can be run afterwards.
+#
+# It needs a build verb AND a buildable thing, because either alone is too
+# broad - "write me a function" has the verb, "what is a game" has the thing.
+AGENT_VERB = re.compile(
+    r"\b(build|make|create|write|code|fix|add|change|update|rename)\b", re.I)
+AGENT_THING = re.compile(
+    r"\b(app|game|website|site|webpage|page|program|script|project|tool|"
+    r"file|folder|\S+\.(py|js|ts|html|css|json|txt|md))\b", re.I)
+
+# A leading question word means the person wants an explanation, not a file.
+# "how do i make a game" matches both patterns above but must NOT build one.
+# "can" is deliberately absent, so "can you build me a game" still counts.
+ASKING = re.compile(r"^\s*(how|what|why|when|where|which|who)\b", re.I)
+
+
+def needs_agent(text):
+    """Should the agent actually build this? Returns (agent: bool, why: str)."""
+    t = text.strip()
+
+    if ASKING.match(t):
+        return False, "this is a question, not a job"
+    if not AGENT_VERB.search(t):
+        return False, "nothing to build"
+    if not AGENT_THING.search(t):
+        return False, "no file or program named"
+
+    return True, "this needs a real file, so I will build it"
+
+
 def needs_petrol(text):
     """Decide which engine answers. Returns (petrol: bool, why: str)."""
     t = text.lower().strip()
@@ -205,7 +239,38 @@ if __name__ == "__main__":
         right += got
         print(f"  {'OK  ' if got else 'FAIL'} petrol:   {q[:38]:38s} -> {why}")
 
-    total = len(electric) + len(petrol)
+    # The agent rule. The costly mistake is a false positive: firing a slow,
+    # paid build on someone who only asked a question.
+    builds = [
+        "build me a game",
+        "make me a website about cats",
+        "write hello.py that prints hello",
+        "fix the bug in server.py",
+        "can you build me a snake game",
+        "create a script that renames files",
+    ]
+    talks = [
+        "write me a function that sorts a list",   # a snippet, not a file
+        "explain what a closure is",
+        "how do i make a game",                    # a question, not a job
+        "what is a game",
+        "why does my code crash",
+        "hello",
+    ]
+
+    print("\n--- agent rule ---")
+    for q in builds:
+        got, why = needs_agent(q)
+        right += got
+        print(f"  {'OK  ' if got else 'FAIL'} build: {q[:38]:38s} -> {why}")
+    print()
+    for q in talks:
+        got, why = needs_agent(q)
+        ok = not got
+        right += ok
+        print(f"  {'OK  ' if ok else 'FAIL'} talk:  {q[:38]:38s} -> {why}")
+
+    total = len(electric) + len(petrol) + len(builds) + len(talks)
     print(f"\n{right}/{total} routed correctly")
     print(f"petrol engine available: {'yes' if petrol_available() else 'NO API KEY'}")
     print(f"{'HYBRID READY' if right == total else 'ROUTING NOT READY'}")

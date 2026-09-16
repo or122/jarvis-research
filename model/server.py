@@ -137,8 +137,8 @@ class Handler(BaseHTTPRequestHandler):
         # Memory first. A stored fact beats a small model's guess every time,
         # and it comes back instantly with no generation at all.
         if as_chat:
-            from hybrid import (ask_petrol, is_production_request, needs_petrol,
-                                petrol_available)
+            from hybrid import (ask_petrol, is_production_request, needs_agent,
+                                needs_petrol, petrol_available)
 
             # A request to PRODUCE something skips the database. Asked to
             # "write me a function that sorts a list", the fuzzy match returned
@@ -152,6 +152,45 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(b"data: [DONE]\n\n")
                     self.wfile.flush()
                     return
+
+            # The agent comes before the petrol engine, because it is the
+            # stronger answer to the same request: asked to "build me a game",
+            # petrol describes one and the agent leaves a file you can run.
+            # It is slow and costs real money, so needs_agent is deliberately
+            # narrow - see its gate in hybrid.py.
+            import agent as agent_mod
+
+            build, agent_why = needs_agent(prompt)
+            if build and agent_mod.available():
+                self.wfile.write(
+                    f"data: {json.dumps({'t': '', 'src': 'agent', 'why': agent_why})}\n\n".encode())
+                self.wfile.flush()
+
+                def progress(kind, detail):
+                    # The build blocks for half a minute or so. Without this
+                    # the browser sits in silence and looks broken.
+                    try:
+                        frame = json.dumps({"t": "", "src": "agent",
+                                            "status": f"{kind}: {detail}"})
+                        self.wfile.write(f"data: {frame}\n\n".encode())
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+
+                try:
+                    text, files, cost = agent_mod.do(prompt, on_event=progress)
+                except Exception as e:
+                    text, files, cost = f"The build failed: {type(e).__name__}", [], 0.0
+
+                frame = json.dumps({"t": text, "src": "agent",
+                                    "files": files, "cost": round(cost, 3)})
+                try:
+                    self.wfile.write(f"data: {frame}\n\n".encode())
+                    self.wfile.write(b"data: [DONE]\n\n")
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                return
 
             # The hybrid: the petrol engine only for what the electric one
             # cannot do, so ordinary chat stays free and offline.

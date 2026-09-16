@@ -10,4 +10,7 @@ model/data/rooms.db
 .env.*
 *.log
 .claude/
+# Whatever the agent builds. It is scratch space that gets rewritten every
+# build, and none of it belongs in the repo's history.
+workspace/
 !.env.example

@@ -25,6 +25,10 @@ const CONFIDENCE: Record<string, string> = {
   command: 'certain',
   opus: 'strong',
   fable: 'strong',
+  // The agent wrote a real file, but it cannot run one, so it has not checked
+  // that the file works. Real code, unverified - that is 'strong', not
+  // 'certain'.
+  agent: 'strong',
   flow: 'guess',
 }
 
@@ -33,6 +37,7 @@ const LABEL: Record<string, string> = {
   command: '⚙ ran it · certain',
   opus: '⛽ Claude Opus',
   fable: '⛽ Claude Fable',
+  agent: '🛠 built it · in the workspace',
   flow: '🔋 my small model · a guess',
 }
 
@@ -53,6 +58,9 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
   const [fixing, setFixing] = useState(false)
   const [fix, setFix] = useState('')
   const [fixed, setFixed] = useState('')
+  // What the agent is doing right now, and what it left behind when it is done.
+  const [status, setStatus] = useState('')
+  const [built, setBuilt] = useState<{ files: string[]; cost: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const pulse = useRef(0)
 
@@ -85,6 +93,8 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
     setAsked(prompt)
     setFixing(false)
     setFixed('')
+    setStatus('')
+    setBuilt(null)
     try {
       const res = await fetch(`${SERVER}/generate`, {
         method: 'POST',
@@ -104,8 +114,15 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
           if (!f.startsWith('data: ')) continue
           const d = f.slice(6)
           if (d === '[DONE]') continue
-          const { t, src } = JSON.parse(d) as { t: string; src?: string }
+          const { t, src, status, files, cost } = JSON.parse(d) as {
+            t: string; src?: string; status?: string
+            files?: string[]; cost?: number
+          }
           if (src) setEngine(src)
+          // A build takes half a minute. These frames carry no text, only news
+          // of what is happening, so the screen is never silently frozen.
+          if (status) setStatus(status)
+          if (files) setBuilt({ files, cost: cost ?? 0 })
           setReply((r) => r + t)
           pulse.current++
         }
@@ -248,7 +265,29 @@ export default function JarvisOS({ onExit }: { onExit: () => void }) {
               JARVIS
               {engine && <em className={`os-engine ${engine}`}>{LABEL[engine] ?? LABEL.flow}</em>}
             </span>
-            {reply || '…'}
+            {/* A build runs for half a minute with nothing to stream, so it
+                says what it is doing instead of showing an empty box. */}
+            {busy && status && !reply && (
+              <span className="os-status">⟳ {status}</span>
+            )}
+
+            {reply || (busy && status ? '' : '…')}
+
+            {/* What the agent actually left on the disk. The claim "I built
+                it" is only checkable if the files are named. */}
+            {built && built.files.length > 0 && (
+              <div className="os-built">
+                <span className="os-built-head">
+                  files in workspace/
+                  {built.cost > 0 && <em> · ${built.cost.toFixed(2)}</em>}
+                </span>
+                <ul>
+                  {built.files.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Every answer can be corrected. That is the strongest trust
                 finding, and here the correction also teaches Jarvis. */}
