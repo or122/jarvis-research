@@ -60,10 +60,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 from sample import load
                 _, tok, meta = load()
+                from hybrid import PETROL_MODEL, petrol_available
                 from knowledge import count
                 body = {"ready": True, "val_loss": round(meta["val_loss"], 4),
                         "iter": meta["iter"], "vocab_size": tok.vocab_size,
-                        "facts": count()}
+                        "facts": count(),
+                        "petrol": petrol_available(),
+                        "petrol_model": PETROL_MODEL}
             except Exception as e:
                 body = {"ready": False, "reason": f"{type(e).__name__}: {e}"}
 
@@ -138,6 +141,37 @@ class Handler(BaseHTTPRequestHandler):
             if fact:
                 frame = json.dumps({"t": fact, "src": "memory"})
                 self.wfile.write(f"data: {frame}\n\n".encode())
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
+                return
+
+            # The hybrid: the petrol engine only for what the electric one
+            # cannot do, so ordinary chat stays free and offline.
+            from hybrid import ask_petrol, needs_petrol, petrol_available
+
+            petrol, why = needs_petrol(prompt)
+            if petrol and petrol_available():
+                self.wfile.write(
+                    f"data: {json.dumps({'t': '', 'src': 'fable', 'why': why})}\n\n".encode())
+                self.wfile.flush()
+                try:
+                    for piece in ask_petrol(prompt):
+                        self.wfile.write(
+                            f"data: {json.dumps({'t': piece, 'src': 'fable'})}\n\n".encode())
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                except Exception as e:
+                    note = f"(petrol engine failed: {type(e).__name__}) "
+                    self.wfile.write(
+                        f"data: {json.dumps({'t': note, 'src': 'fable'})}\n\n".encode())
+                    # Fall through to the small model rather than leaving the
+                    # user with nothing.
+                    with gen_lock:
+                        for piece in chat_stream(prompt, max_tokens, temperature):
+                            self.wfile.write(
+                                f"data: {json.dumps({'t': piece, 'src': 'flow'})}\n\n".encode())
+                            self.wfile.flush()
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
                 return
