@@ -32,7 +32,8 @@ function readHistory(): Message[] {
   }
 }
 
-export default function App({ onRooms }: { onRooms: () => void }) {
+export default function App({ onRooms, onHud }:
+  { onRooms: () => void; onHud: () => void }) {
   const [messages, setMessages] = useState<Message[]>(readHistory)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -155,6 +156,9 @@ export default function App({ onRooms }: { onRooms: () => void }) {
           </button>
           <button className="chip" onClick={onRooms}>
             Rooms
+          </button>
+          <button className="chip" onClick={onHud}>
+            Jarvis
           </button>
         </div>
       </header>

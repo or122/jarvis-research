@@ -1,0 +1,348 @@
+/* Jarvis HUD — dark, cyan, three-dimensional.
+ *
+ * Everything here is CSS transforms and SVG. No 3D library: the app must load
+ * instantly and run with the wifi off.
+ *
+ * The depth comes from three things working together — perspective on the
+ * stage, rings tilted onto different planes, and glow that falls off with
+ * distance. Any one alone reads as flat.
+ */
+
+:root {
+  --hud-bg: #03070d;
+  --hud-cyan: #4fe3ff;
+  --hud-cyan-dim: #1b7f99;
+  --hud-deep: #0a1824;
+  --hud-text: #cfefff;
+  --hud-muted: #5b8ba3;
+  --hud-warn: #ff9a4f;
+  --hud-line: rgba(79, 227, 255, 0.22);
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 42%, #0b2030 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, #06131d 0%, transparent 70%),
+    var(--hud-bg);
+  color: var(--hud-text);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* A faint grid gives the black some structure, so it reads as space
+   rather than an empty div. */
+.hud::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--hud-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.13;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- reactor */
+.reactor {
+  display: grid;
+  place-items: center;
+  padding: 26px 0 10px;
+  flex-shrink: 0;
+}
+
+/* perspective is what makes the tilts below read as depth rather than squash */
+.reactor-stage {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  perspective: 620px;
+  transform-style: preserve-3d;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.ring svg { width: 100%; height: 100%; overflow: visible; }
+
+.ring-line {
+  fill: none;
+  stroke: var(--hud-cyan);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.tick { stroke: var(--hud-cyan); stroke-width: 1; opacity: 0.4; }
+.tick-long { stroke-width: 1.6; opacity: 0.85; }
+
+/* Each ring sits on its own plane and turns at its own rate. Matching speeds
+   would collapse the whole thing into one flat spinning disc. */
+.ring-outer {
+  transform: rotateX(62deg);
+  animation: spin 26s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(79, 227, 255, 0.55));
+}
+.ring-mid {
+  transform: rotateX(-48deg) rotateY(14deg);
+  animation: spin-back 17s linear infinite;
+  filter: drop-shadow(0 0 7px rgba(79, 227, 255, 0.65));
+}
+.ring-inner {
+  transform: rotateX(28deg) rotateZ(10deg);
+  animation: spin 9s linear infinite;
+  filter: drop-shadow(0 0 9px rgba(79, 227, 255, 0.8));
+}
+
+.arc-a { stroke-dasharray: 84 36; opacity: 0.8; }
+.arc-b { stroke-dasharray: 26 52; opacity: 0.5; }
+
+.segment {
+  fill: none;
+  stroke: var(--hud-cyan);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.core {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.core-glow {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 227, 255, 0.85) 0%,
+              rgba(79, 227, 255, 0.28) 42%, transparent 72%);
+  animation: breathe 3.6s ease-in-out infinite;
+}
+
+.core-dot {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #ffffff, var(--hud-cyan) 55%,
+              var(--hud-cyan-dim) 100%);
+  box-shadow: 0 0 22px var(--hud-cyan), 0 0 56px rgba(79, 227, 255, 0.65);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin-back { to { transform: rotate(-360deg); } }
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; transform: scale(0.94); }
+  50%      { opacity: 1;   transform: scale(1.07); }
+}
+
+/* The reactor is also the status light — you can tell what Jarvis is doing
+   from across the room without reading anything. */
+.reactor-thinking .ring-inner { animation-duration: 1.5s; }
+.reactor-thinking .ring-mid   { animation-duration: 5s; }
+.reactor-thinking .core-glow  { animation-duration: 0.9s; }
+
+.reactor-speaking .core-glow  { animation-duration: 0.45s; }
+.reactor-speaking .segment    { stroke-width: 7; }
+
+.reactor-listening .core-dot {
+  box-shadow: 0 0 30px var(--hud-warn), 0 0 70px rgba(255, 154, 79, 0.6);
+  background: radial-gradient(circle at 38% 34%, #fff, var(--hud-warn) 55%, #a35a24 100%);
+}
+
+/* ------------------------------------------------------------------ chrome */
+.hud-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 26px 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+  z-index: 2;
+}
+
+.hud-name {
+  font-size: 15px;
+  letter-spacing: 0.42em;
+  color: var(--hud-cyan);
+  text-shadow: 0 0 14px rgba(79, 227, 255, 0.7);
+}
+
+.hud-stat { display: flex; gap: 16px; }
+.hud-stat b { color: var(--hud-text); font-weight: 500; }
+
+.hud-state {
+  text-align: center;
+  font-size: 10.5px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--hud-cyan);
+  opacity: 0.85;
+  min-height: 14px;
+  margin-bottom: 4px;
+}
+
+/* --------------------------------------------------------------- messages */
+.hud-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 26px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 2;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-cyan-dim) transparent;
+}
+
+.hud-msg {
+  max-width: 82%;
+  padding: 11px 15px;
+  font-size: 13.5px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--hud-line);
+  background: linear-gradient(180deg, rgba(10, 30, 44, 0.85), rgba(6, 18, 28, 0.85));
+  /* Cut corners instead of rounding them — angular reads technical, and it is
+     the single cheapest way to stop this looking like an ordinary chat app. */
+  clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px),
+                     calc(100% - 10px) 100%, 0 100%);
+  animation: msg-in 0.28s ease-out;
+}
+
+.hud-msg.from-you {
+  align-self: flex-end;
+  border-color: rgba(120, 160, 190, 0.3);
+  color: #dce9f2;
+  background: linear-gradient(180deg, rgba(18, 34, 46, 0.8), rgba(10, 22, 32, 0.8));
+}
+
+.hud-msg.from-jarvis {
+  align-self: flex-start;
+  border-color: rgba(79, 227, 255, 0.4);
+  box-shadow: 0 0 22px rgba(79, 227, 255, 0.11), inset 0 0 22px rgba(79, 227, 255, 0.05);
+}
+
+.hud-who {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+  margin-bottom: 5px;
+}
+.from-jarvis .hud-who { color: var(--hud-cyan); }
+
+.hud-src {
+  margin-left: 8px;
+  font-style: normal;
+  color: var(--hud-cyan-dim);
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.hud-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--hud-muted);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  line-height: 1.9;
+}
+.hud-empty b { color: var(--hud-cyan); font-weight: 500; }
+
+/* ------------------------------------------------------------------ input */
+.hud-input {
+  display: flex;
+  gap: 12px;
+  padding: 14px 26px 22px;
+  z-index: 2;
+  border-top: 1px solid var(--hud-line);
+  background: linear-gradient(180deg, transparent, rgba(3, 7, 13, 0.9));
+}
+
+.hud-input input {
+  flex: 1;
+  background: rgba(10, 26, 38, 0.7);
+  border: 1px solid var(--hud-line);
+  color: var(--hud-text);
+  font: inherit;
+  font-size: 14px;
+  padding: 12px 16px;
+  letter-spacing: 0.04em;
+  clip-path: polygon(0 9px, 9px 0, 100% 0, 100% calc(100% - 9px),
+                     calc(100% - 9px) 100%, 0 100%);
+}
+.hud-input input::placeholder { color: var(--hud-muted); }
+.hud-input input:focus {
+  outline: none;
+  border-color: var(--hud-cyan);
+  box-shadow: 0 0 20px rgba(79, 227, 255, 0.2);
+}
+
+.hud-btn {
+  background: rgba(79, 227, 255, 0.1);
+  border: 1px solid var(--hud-cyan);
+  color: var(--hud-cyan);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0 22px;
+  cursor: pointer;
+  clip-path: polygon(0 9px, 9px 0, 100% 0, 100% calc(100% - 9px),
+                     calc(100% - 9px) 100%, 0 100%);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.hud-btn:hover:not(:disabled) {
+  background: rgba(79, 227, 255, 0.2);
+  box-shadow: 0 0 24px rgba(79, 227, 255, 0.35);
+}
+.hud-btn:disabled { opacity: 0.35; cursor: default; }
+
+.hud-chip {
+  background: none;
+  border: 1px solid var(--hud-line);
+  color: var(--hud-muted);
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 6px 13px;
+  cursor: pointer;
+}
+.hud-chip:hover { color: var(--hud-cyan); border-color: var(--hud-cyan); }
+
+.hud-chips {
+  display: flex;
+  gap: 9px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+/* Narrow screens: the reactor shrinks rather than pushing the chat away. */
+@media (max-height: 700px) {
+  .reactor-stage { width: 140px; height: 140px; }
+  .reactor { padding: 14px 0 4px; }
+}
+
+/* Anyone who asked the system to reduce motion gets a still reactor. */
+@media (prefers-reduced-motion: reduce) {
+  .ring, .core-glow { animation: none !important; }
+}
