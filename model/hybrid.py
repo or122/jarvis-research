@@ -52,10 +52,13 @@ def _load_env_file(path=ENV_FILE):
 
 _load_env_file()
 
-# claude-fable-5-1 is Or's explicit choice: Anthropic's most capable model.
-# It is also the most expensive at $10/$50 per million tokens, which is why
-# the router below sends as little to it as possible.
-PETROL_MODEL = os.environ.get("JARVIS_PETROL", "claude-fable-5-1")
+# Claude Opus 5, Or's choice: $5/$25 per million tokens, half the price of
+# Fable 5.1 and still a frontier model. The router below still sends as little
+# as possible to it - a paid answer should be the exception, not the habit.
+#
+# Same request shape as Fable: thinking is on by default so the parameter is
+# omitted, temperature is not accepted, and fallbacks are enabled.
+PETROL_MODEL = os.environ.get("JARVIS_PETROL", "claude-opus-5")
 
 # A cost cap, not a quality choice: 4k is plenty for a function or an
 # explanation, and stops one runaway answer costing a fortune.
@@ -118,9 +121,9 @@ def strip_summons(text):
 
 
 def ask_petrol(text, stream=True):
-    """Run Claude Fable. Yields text chunks.
+    """Run the petrol engine. Yields text chunks.
 
-    Fable 5.1 notes that differ from older models: thinking is always on so the
+    Things that differ from older models: thinking is on by default so the
     `thinking` parameter is omitted entirely, temperature is not accepted, and
     server-side fallbacks are enabled so a safety decline is answered by
     another model inside the same call rather than returning nothing.
