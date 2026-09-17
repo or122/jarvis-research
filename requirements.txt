@@ -1,2 +1,12 @@
+# Needs Python 3.11. torch has no build newer than 2.2.2 for an Intel Mac,
+# but 2.2.2 does have a 3.11 wheel - which is what makes this combination
+# possible at all.
 torch==2.2.2
 numpy==1.26.4
+
+# Jarvis's hands: the agent that writes real files. Needs Python 3.10+.
+claude-agent-sdk
+
+# The petrol engine. Pinned, because moving Python and upgrading this at the
+# same time would mean not knowing which one broke it.
+anthropic==0.125.0

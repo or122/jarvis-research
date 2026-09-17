@@ -85,8 +85,8 @@ never pretends otherwise — Jarvis is taught to say so out loud.
 ## Run it
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt      # torch 2.2.2, numpy
+python3.11 -m venv .venv
+.venv/bin/pip install -r requirements.txt      # torch 2.2.2, numpy, the SDK
 
 # the assistant, in your terminal
 .venv/bin/python model/jarvis.py "what time is it"
@@ -96,7 +96,12 @@ cd model && ../.venv/bin/python server.py      # terminal 1
 cd web && npm install && npm run dev           # terminal 2 -> localhost:5173
 ```
 
-`torch` is pinned to **2.2.2** — the last version with a macOS Intel build.
+**Python 3.11**, because the Claude Agent SDK — the part that lets Jarvis
+write real files — needs 3.10 or newer.
+
+`torch` is pinned to **2.2.2**, the last version with a macOS Intel build. It
+does have a 3.11 wheel, which is the whole reason this works: the Mac gets a
+new enough Python *and* keeps the only PyTorch it can run.
 
 > The trained weights aren't in the repo (they're 130 MB). Train your own with
 > the steps below, or ask me for the checkpoint.
